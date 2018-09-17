@@ -315,6 +315,11 @@ function Find-IPv4Device {
 	.PARAMETER  ParentProgressId
 		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID		
 
+	.PARAMETER  TimeoutSeconds
+		Number of seconds to wait for WMI connectivity test to return before timing out.
+		
+		If not provided then 30 seconds is used as the default.
+
 	.EXAMPLE
 		Find-IPv4Device -DNSServer automatic -DNSDomain automatic -PrivateOnly
 		
@@ -415,6 +420,12 @@ function Find-IPv4Device {
 		[ValidateNotNull()]
 		[Int32]
 		$ParentProgressId = -1
+		,
+		[Parameter(Mandatory=$false)] 
+		[ValidateRange(1,32767)]
+		[alias('Timeout')]
+		[Int16]
+		$TimeoutSeconds = 30
 	)
 	process {
 
@@ -796,7 +807,7 @@ function Find-IPv4Device {
 							Write-NetworkScanLog -Message "PING response from $($Device[$HashKey].IPAddress): $($Device[$HashKey].IsPingAlive)" -MessageLevel Verbose
 						}
 					}
-				}
+				} 
 			}
 
 			# Found that in some cases an ACCESS_VIOLATION error occurs if we don't delay a little bit during each iteration 
@@ -920,6 +931,7 @@ function Find-IPv4Device {
 						PowerShell = $PowerShell
 						Runspace = $PowerShell.BeginInvoke()
 						HashKey = $_.Key
+						StartDate = [DateTime]::Now
 					}
 				)) | Out-Null
 
@@ -947,9 +959,11 @@ function Find-IPv4Device {
 						# Double check that we've got a DNS Hostname. If not, get it from DNS
 						# If we do have a DNS Hostname that doesn't begin with the WMI Machine Name and $ResolveAliases is true, get the machine name from DNS
 						if (
-							(								!$Device[$HashKey].DnsRecordName) `
-							-or `
-							(								(									$ResolveAliases -eq $true) -and ($Device[$HashKey].DnsRecordName.StartsWith($HostName, 'CurrentCultureIgnoreCase') -ne $true))
+							!$Device[$HashKey].DnsRecordName -or
+							(
+								$ResolveAliases -eq $true -and 
+								$Device[$HashKey].DnsRecordName.StartsWith($HostName, 'CurrentCultureIgnoreCase') -ne $true
+							)
 						) {
 							try {
 								[System.Net.Dns]::GetHostByName($HostName) | ForEach-Object {
@@ -975,6 +989,25 @@ function Find-IPv4Device {
 						} else {
 							Write-NetworkScanLog -Message "WMI response from $($Device[$HashKey].IPAddress): $($Device[$HashKey].IsWmiAlive)" -MessageLevel Verbose
 						}
+					}
+				}
+				elseif ($([DateTime]::Now).Subtract($_.StartDate).TotalSeconds -gt $TimeoutSeconds) {
+
+					$HashKey = $_.HashKey
+					$_.PowerShell.Stop()
+					$_.PowerShell.dispose()
+					$_.Runspace = $null
+					$_.PowerShell = $null
+
+					if ($Device[$HashKey].DnsRecordName) {
+						Write-NetworkScanLog -Message "Timeout waiting for WMI response from $($Device[$HashKey].DnsRecordName) ($($Device[$HashKey].IPAddress))" -MessageLevel Warning
+						Write-NetworkScanLog -Message "WMI response from $($Device[$HashKey].DnsRecordName) ($($Device[$HashKey].IPAddress)): $($Device[$HashKey].IsWmiAlive)" -MessageLevel Verbose
+					} elseif ($Device[$HashKey].WmiMachineName) {
+						Write-NetworkScanLog -Message "Timeout waiting for WMI response from $($Device[$HashKey].WmiMachineName) ($($Device[$HashKey].IPAddress))" -MessageLevel Warning
+						Write-NetworkScanLog -Message "WMI response from $($Device[$HashKey].WmiMachineName) ($($Device[$HashKey].IPAddress)): $($Device[$HashKey].IsWmiAlive)" -MessageLevel Verbose
+					} else {
+						Write-NetworkScanLog -Message "Timeout waiting for WMI response from $($Device[$HashKey].IPAddress): $($Device[$HashKey].IsWmiAlive)" -MessageLevel Warning
+						Write-NetworkScanLog -Message "WMI response from $($Device[$HashKey].IPAddress): $($Device[$HashKey].IsWmiAlive)" -MessageLevel Verbose
 					}
 				}
 			}
@@ -1247,7 +1280,7 @@ function Find-SqlServerService {
 		$RunspacePool.Open()
 
 		# Create an empty collection to hold the Runspace jobs
-		$Runspaces = New-Object System.Collections.ArrayList 
+		$Runspaces = New-Object System.Collections.ArrayList
 
 
 		$ScanCount = 0
@@ -1277,10 +1310,8 @@ function Find-SqlServerService {
 			$DomainName = $null
 			$ServiceTypeName = $null
 			$ServiceName = $null
-			$Server = $null
 			$Port = $null
 			$IsDynamicPort = $false
-			$ServiceInstallDate = $null
 			$ServiceStartDate = $null
 
 			$StdRegProv = $null
@@ -1361,31 +1392,72 @@ function Find-SqlServerService {
 					# Get the port number for SQL Server Services
 					#if ($_.Type -eq $ManagedServiceTypeEnum::SqlServer) {
 					if ($ServiceTypeName -ieq 'SQL Server') {
-						$ServiceName = $_.Name
+
+						$ServiceIpAddress = $null
+						$Port = $null
+						$IsDynamicPort = $null
+						$ServiceName = if ($IsNamedInstance -eq $true) { $InstanceName } else { $_.Name }
 						$ManagedComputer.ServerInstances | Where-Object { $_.Name -ieq $ServiceName } | ForEach-Object {
 
-							$_.ServerProtocols | Where-Object { $_.Name -ieq 'tcp' } | ForEach-Object {
+							$_.ServerProtocols | Where-Object { 
+								$_.Name -ieq 'tcp' -and
+								$_.IsEnabled -eq $true
+							} | ForEach-Object {
 
-								# First get the port for all IP Addresses
-								$_.IPAddresses | Where-Object { $_.Name -ieq 'ipall' } | ForEach-Object {
-									$Port = $_.IPAddressProperties['TcpPort'].Value
-									if (-not $Port) {
-										$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
-										$IsDynamicPort = $true
-									} else {
-										$IsDynamicPort = $false
-									}
-								}
+								# If listening on all IPs then get the "IPAll" port info
+								# Otherwise get port info for an IP that's enabled and active
 
-								# Then check to see if the port is overridden for the specific IP Address provided
-								$_.IPAddresses | Where-Object { ($_.IPAddress -ieq $ServiceIpAddress) -and ($_.IPAddressProperties['Active'].Value -eq $true) -and ($_.IPAddressProperties['Enabled'].Value -eq $true) } | ForEach-Object {
-									$Port = $_.IPAddressProperties['TcpPort'].Value
-									if (-not $Port) {
-										$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
-										$IsDynamicPort = $true
-									} else {
-										$IsDynamicPort = $false
+								if ($_.ProtocolProperties['ListenOnAllIPs'].Value -eq $true) {
+
+									$_.IPAddresses | Where-Object { $_.Name -ieq 'ipall' } | ForEach-Object {
+										$Port = $_.IPAddressProperties['TcpPort'].Value
+										if (-not $Port) {
+											$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
+											$IsDynamicPort = $true
+										} else {
+											$IsDynamicPort = $false
+										}
 									}
+
+								} else {
+
+									# Start with 127.0.0.1 first in case that's the only IP that's enabled
+									$_.IPAddresses | Where-Object {
+										$_.IPAddressProperties['Active'].Value -eq $true -and 
+										$_.IPAddressProperties['Enabled'].Value -eq $true -and
+										$_.IPAddress.AddressFamily -ieq 'InterNetwork' -and
+										$_.IPAddress -ieq '127.0.0.1'
+									} | Select-Object -First 1 | ForEach-Object {
+
+										$ServiceIpAddress = $_.IPAddress.ToString()
+										$Port = $_.IPAddressProperties['TcpPort'].Value
+
+										if (-not $Port) {
+											$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
+											$IsDynamicPort = $true
+										} else {
+											$IsDynamicPort = $false
+										}
+									}
+
+									# Now try and see if there's a non-loopback IP enabled
+									$_.IPAddresses | Where-Object {
+										$_.IPAddressProperties['Active'].Value -eq $true -and 
+										$_.IPAddressProperties['Enabled'].Value -eq $true -and
+										$_.IPAddress.AddressFamily -ieq 'InterNetwork' -and
+										$_.IPAddress -ine '127.0.0.1'
+									} | Select-Object -First 1 | ForEach-Object {
+
+										$ServiceIpAddress = $_.IPAddress.ToString()
+										$Port = $_.IPAddressProperties['TcpPort'].Value
+
+										if (-not $Port) {
+											$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
+											$IsDynamicPort = $true
+										} else {
+											$IsDynamicPort = $false
+										}
+									} 
 								}
 							}
 
@@ -1409,12 +1481,6 @@ function Find-SqlServerService {
 					} else {
 						$ServiceStartDate = $null
 					}
-
-					# 					# Get the Service Install Date
-					# 					Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service -Filter "DisplayName = '$($_.DisplayName)'" -Property CreationDate -ComputerName $IpAddress | ForEach-Object {
-					# 						$ServiceStartDate = $_.CreationDate
-					# 					}
-
 
 					Write-Output (
 						New-Object -TypeName psobject -Property @{
@@ -1486,7 +1552,17 @@ function Find-SqlServerService {
 							# Determine if instance is clustered
 							$IsClusteredInstance = $null
 							$ClusterName = [String]::Empty
-							$ServiceIpAddress = $IpAddress
+
+							# If $ComputerName is the local host then use the loopback IP, otherwise use $IpAddress
+							if (
+								$ComputerName -ieq $env:COMPUTERNAME -or
+								$ComputerName.StartsWith([String]::Concat($env:COMPUTERNAME, '.'), [System.StringComparison]::InvariantCultureIgnoreCase)
+							) {
+								$ServiceIpAddress = '127.0.0.1'
+							} else {
+								$ServiceIpAddress = $IpAddress
+							}
+
 
 							# Get the TCP port number for SQL Server Services
 							$Port = ($StdRegProv.GetStringValue($HKEY_LOCAL_MACHINE,"$RegistryKeyRootPath\MSSQLServer\SuperSocketNetLib\Tcp",'TcpDynamicPorts')).sValue

@@ -361,9 +361,9 @@ function Get-WindowsInventory {
 			StartDateUTC = [DateTime]::UtcNow
 			EndDateUTC = $null
 			ScanSuccessCount = 0
-			ScanErrorCount = 0
+			ScanFailCount = 0
 		} | Add-Member -MemberType ScriptProperty -Name ScanCount -Value {
-			$this.ScanErrorCount + $this.ScanSuccessCount
+			$this.ScanFailCount + $this.ScanSuccessCount
 		} -PassThru
 
 		$WmiDevice = @()
@@ -510,14 +510,14 @@ function Get-WindowsInventory {
 								$Inventory.ScanSuccessCount++
 								Write-WindowsInventoryLog -Message "Scanned $($DeviceInfo.WmiMachineName) at IP address $($DeviceInfo.IPAddress) with $($_.ScanErrorCount) errors" -MessageLevel Information
 							} else {
-								$Inventory.ScanErrorCount++
+								$Inventory.ScanFailCount++
 								Write-WindowsInventoryLog -Message "Failed to scan $($DeviceInfo.WmiMachineName) at IP address $($DeviceInfo.IPAddress) -  $($_.ScanErrorCount) errors" -MessageLevel Error
 							}
 
 						} 
 					}
 					catch {
-						$Inventory.ScanErrorCount++
+						$Inventory.ScanFailCount++
 						Write-WindowsInventoryLog -Message "An unrecoverable error was encountered while attempting to retrieve machine information from $($DeviceInfo.WmiMachineName) at IP address $($DeviceInfo.IPAddress)" -MessageLevel Error
 					}
 					finally {
@@ -549,7 +549,7 @@ function Get-WindowsInventory {
 
 		Write-Progress -Activity 'Scanning Machines' -PercentComplete 100 -Status 'Scan Complete' -Id $ScanProgressId -ParentId $MasterProgressId -Completed
 		Write-Progress -Activity 'Windows Inventory' -PercentComplete 100 -Status 'Inventory Complete' -Id $MasterProgressId -ParentId $ParentProgressId -Completed
-		Write-WindowsInventoryLog -Message "Machine scan complete (Success: $($Inventory.ScanSuccessCount); Errors: $($Inventory.ScanErrorCount))" -MessageLevel Information
+		Write-WindowsInventoryLog -Message "Machine scan complete (Success: $($Inventory.ScanSuccessCount); Failure: $($Inventory.ScanFailCount))" -MessageLevel Information
 		Write-WindowsInventoryLog -Message "End Function: $($MyInvocation.InvocationName)" -MessageLevel Debug 
 
 		# Output the results

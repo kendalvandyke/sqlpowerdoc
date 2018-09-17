@@ -4,7 +4,7 @@
 	ModuleToProcess = 'LogHelper'
 
 	# Version number of this module.
-	ModuleVersion = '1.0.0.0'
+	ModuleVersion = '1.0.1.0'
 
 	# ID used to uniquely identify this module
 	GUID = '{9b13d1af-effb-4827-b880-17e106dac3a1}'

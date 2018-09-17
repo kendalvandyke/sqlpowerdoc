@@ -770,14 +770,14 @@ function Import-SqlServerInventoryFromGzClixml {
 			# This reference was removed by ConvertTo-GzSqlServerInventory
 			foreach ($Machine in ($Inventory.WindowsInventory.Machine)) {
 				$Inventory.Service | Where-Object { 
-                    $_.ServiceTypeName -ieq 'sql server' -and
+					$_.ServiceTypeName -ieq 'sql server' -and
 					(
-                        $_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -or
-                        (
-                            $_.ComputerName.StartsWith($Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName, [System.StringComparison]::InvariantCultureIgnoreCase) -and
-                            $($Machine.Hardware.NetworkAdapter | ForEach-Object { $_.IPAddress }) -icontains $_.ComputerIpAddress
-                        )
-                    )
+						$_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -or
+						(
+							$_.ComputerName.StartsWith($Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName, [System.StringComparison]::InvariantCultureIgnoreCase) -and
+							$($Machine.Hardware.NetworkAdapter | ForEach-Object { $_.IPAddress }) -icontains $_.ComputerIpAddress
+						)
+					)
 				} | ForEach-Object {
 					$InventoryServiceId = $_.InventoryServiceId
 					$Inventory.DatabaseServer | Where-Object { $_.InventoryServiceId -ieq $InventoryServiceId } | ForEach-Object {
@@ -1047,11 +1047,11 @@ function Get-SqlServerInventory {
 			StartDateUTC = [DateTime]::UtcNow
 			EndDateUTC = $null
 			DatabaseServerScanSuccessCount = 0
-			DatabaseServerScanErrorCount = 0
+			DatabaseServerScanFailCount = 0
 			#MachineScanSuccessCount = 0
 			#MachineScanErrorCount = 0
 		} | Add-Member -MemberType ScriptProperty -Name DatabaseServerScanCount -Value {
-			$this.DatabaseServerScanSuccessCount + $this.DatabaseServerScanErrorCount
+			$this.DatabaseServerScanSuccessCount + $this.DatabaseServerScanFailCount
 		} -PassThru
 
 
@@ -1221,18 +1221,23 @@ function Get-SqlServerInventory {
 		$Inventory.Service | Where-Object { ($_.ServiceTypeName -ieq 'sql server') -and ($_.ServiceState -ieq 'running') } | ForEach-Object {
 
 			$CurrentScanCount++
-			Write-SqlServerInventoryLog -Message "Gathering information from $($_.ServerName) at $($_.ServiceIpAddress) [Instance $CurrentScanCount of $TotalScanCount]" -MessageLevel Information
+			if ($_.ServiceIpAddress) {
+				Write-SqlServerInventoryLog -Message "Gathering information from $($_.ServerName) at $($_.ServiceIpAddress) [Instance $CurrentScanCount of $TotalScanCount]" -MessageLevel Information
+			} else {
+				Write-SqlServerInventoryLog -Message "Gathering information from $($_.ServerName) [Instance $CurrentScanCount of $TotalScanCount]" -MessageLevel Information
+			}
 
 			# Build command for splatting
 			$ParameterHash = @{
 				InstanceName = $_.ServerName
-				StopAtErrorCount = $ScanErrorThreshold
+				IpAddress = $_.ServiceIpAddress
 				Port = if ($_.Port -eq 1433) { $null } else { $_.Port }
+				StopAtErrorCount = $ScanErrorThreshold
 				IncludeDatabaseObjectPermissions = $IncludeDatabaseObjectPermissions
 				IncludeDatabaseObjectInformation = $IncludeDatabaseObjectInformation
 				IncludeDatabaseSystemObjects = $IncludeDatabaseSystemObjects
 			}
-			
+
 			if (-not [String]::IsNullOrEmpty($Username)) {
 				$ParameterHash.Add('Username',$Username)
 				$ParameterHash.Add('Password',$Password)
@@ -1326,13 +1331,13 @@ function Get-SqlServerInventory {
 								Write-SqlServerInventoryLog -Message "Scanned $($ServiceInfo.ServerName) with $($_.ScanErrorCount) errors" -MessageLevel Information
 
 							} else {
-								$Inventory.DatabaseServerScanErrorCount++
+								$Inventory.DatabaseServerScanFailCount++
 								Write-SqlServerInventoryLog -Message "Failed to scan $($ServiceInfo.ServerName) -  $($_.ScanErrorCount) errors" -MessageLevel Error
 							}
 						} 
 					}
 					catch {
-						$Inventory.DatabaseServerScanErrorCount++
+						$Inventory.DatabaseServerScanFailCount++
 						Write-SqlServerInventoryLog -Message "An unrecoverable error was encountered while attempting to retrieve information from $($ServiceInfo.ServerName)" -MessageLevel Error
 					}
 					finally {
@@ -1360,7 +1365,7 @@ function Get-SqlServerInventory {
 		$RunspacePool.close()
 
 		Write-Progress -Activity 'Scanning Instances' -PercentComplete 100 -Status 'Scan Complete' -Id $ScanProgressId -ParentId $MasterProgressId
-		Write-SqlServerInventoryLog -Message "Instance scan complete (Success: $($Inventory.DatabaseServerScanSuccessCount); Errors: $($Inventory.DatabaseServerScanErrorCount))" -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "Instance scan complete (Success: $($Inventory.DatabaseServerScanSuccessCount); Failure: $($Inventory.DatabaseServerScanFailCount))" -MessageLevel Information
 
 
 		# Now collect information about Windows for each distinct machine we found a running SQL Service on
@@ -1391,14 +1396,14 @@ function Get-SqlServerInventory {
 			# Create a reference from each DatabaseServer to its Windows machine
 			foreach ($Machine in ($Inventory.WindowsInventory.Machine)) {
 				$Inventory.Service | Where-Object {
-                    $_.ServiceTypeName -ieq 'sql server' -and
+					$_.ServiceTypeName -ieq 'sql server' -and
 					(
-                        $_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -or
-                        (
-                            $_.ComputerName.StartsWith($Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName, [System.StringComparison]::InvariantCultureIgnoreCase) -and
-                            $($Machine.Hardware.NetworkAdapter | ForEach-Object { $_.IPAddress }) -icontains $_.ComputerIpAddress
-                        )
-                    )
+						$_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -or
+						(
+							$_.ComputerName.StartsWith($Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName, [System.StringComparison]::InvariantCultureIgnoreCase) -and
+							$($Machine.Hardware.NetworkAdapter | ForEach-Object { $_.IPAddress }) -icontains $_.ComputerIpAddress
+						)
+					)
 				} | ForEach-Object {
 					$InventoryServiceId = $_.InventoryServiceId
 					$Inventory.DatabaseServer | Where-Object { $_.InventoryServiceId -ieq $InventoryServiceId } | ForEach-Object {
@@ -2934,7 +2939,10 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 						#endregion
 
 						# Do further analysis if any database files exist on the current drive
-						if ($HasDatabaseFile -eq $true) {
+						if (
+							$HasDatabaseFile -eq $true -and
+							-not [String]::IsNullOrEmpty($LogicalDisk.AllocationUnitSizeBytes)
+						) {
 
 							# Nonaligned partitions
 							#region

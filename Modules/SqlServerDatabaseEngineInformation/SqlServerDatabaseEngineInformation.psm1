@@ -3754,6 +3754,10 @@ function Get-SqlConnection {
 		$Instance = '(local)'
 		,
 		[Parameter(Mandatory=$false)]
+		[System.Net.IPAddress]
+		$IpAddress = $null
+		,
+		[Parameter(Mandatory=$false)]
 		[Int]
 		$Port = $null
 		, 
@@ -3788,7 +3792,11 @@ function Get-SqlConnection {
 		$SQLConnection = New-Object -TypeName System.Data.SqlClient.SqlConnection
 		$SQLConnectionBuilder = New-Object -TypeName system.Data.SqlClient.SqlConnectionStringBuilder
 
-		$SQLConnectionBuilder.psBase.DataSource = if ($Port) { "$Instance,$Port" } else { $Instance }
+		$SQLConnectionBuilder.psBase.DataSource = if ($IpAddress) {
+			if ($Port) { "$($IpAddress.ToString()),$Port" } else { $IpAddress.ToString() }
+		} else {
+			if ($Port) { "$Instance,$Port" } else { $Instance }
+		}
 		$SQLConnectionBuilder.psBase.InitialCatalog = $Database
 
 		if ($PSCmdlet.ParameterSetName -eq 'SQLAuthentication') {
@@ -11126,6 +11134,11 @@ function Get-SqlServerDatabaseEngineInformation {
 	.PARAMETER  InstanceName
 		The database engine instance to connect to.
 
+	.PARAMETER  IpAddress
+		The IP Address to use when connecting to the database engine.
+		
+		If not provided, the value provided for InstanceName will be used to connect instead.
+
 	.PARAMETER  Port
 		The port to use when connecting to the database engine.
 		
@@ -11267,6 +11280,10 @@ function Get-SqlServerDatabaseEngineInformation {
 		$InstanceName = '(local)'
 		,
 		[Parameter(Mandatory=$false)] 
+		[System.Net.IPAddress]
+		$IpAddress = $null
+		,
+		[Parameter(Mandatory=$false)] 
 		[int]
 		$Port = $null
 		,
@@ -11341,9 +11358,9 @@ function Get-SqlServerDatabaseEngineInformation {
 
 
 		if ($PSCmdlet.ParameterSetName -eq 'SQLAuthentication') {
-			$Connection = Get-SqlConnection -Instance $InstanceName -Port $Port -Username $Username -Password $Password
+			$Connection = Get-SqlConnection -Instance $InstanceName -IpAddress $IpAddress -Port $Port -Username $Username -Password $Password
 		} else {
-			$Connection = Get-SqlConnection -Instance $InstanceName -Port $Port
+			$Connection = Get-SqlConnection -Instance $InstanceName -IpAddress $IpAddress -Port $Port
 		}
 
 
@@ -11725,5 +11742,13 @@ function Get-SqlServerDatabaseEngineInformation {
 	if ($SmoMajorVersion -ge 10) {
 		[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMOExtended') | Out-Null
 		[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SQLWMIManagement') | Out-Null
+	}
+}
+
+# Now check which SMO assemblies are loaded and set $SmoMajorVersion to the lowest version
+[System.AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.FullName -ilike 'Microsoft.SqlServer.SMO, Version=*' } | ForEach-Object {
+	if ($_.GetName().Version.Major -lt $SmoMajorVersion) {
+		$SmoMajorVersion = $_.GetName().Version.Major
+		Write-SqlServerDatabaseEngineInformationLog -Message "Multiple versions of Microsoft.SqlServer.SMO are loaded; reverting to the lowest version to avoid problems" -MessageLevel Warning
 	}
 }
