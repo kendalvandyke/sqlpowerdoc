@@ -3362,7 +3362,10 @@ function Get-ApplicationInformationFromRegistry($RegistryProvider) {
 			$Application.UpdateInfoURL = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'URLUpdateInfo')).sValue
 
 			$InstallDate = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'InstallDate')).sValue
-			if (($InstallDate) -and ($InstallDate.Length -eq 8)) {
+			if ($InstallDate -and 
+				$InstallDate.Length -eq 8 -and
+				$InstallDate -imatch '^\d{8}$'
+			) {
 				# If populated the format should be YYYYMMDD
 				$Application.InstallDateUTC = $(Get-Date -Year $($InstallDate).Substring(0,4) -Month $($InstallDate).Substring(4,2) -Day $($InstallDate).Substring(6,2) -Hour 0 -Minute 0 -Second 0 )
 			}
@@ -3480,6 +3483,67 @@ function Get-PatchInformationFromRegistry($RegistryProvider) {
 
 }
 
+
+######################
+# EXTERNAL EXE FUNCTIONS
+######################
+
+# This function is a total hackjob
+# It should be easier to do this in PowerShell but it's not
+# So we're stuck with having to Frankenstein together psExec and WMI to get it to work :-(
+# For more information on secedit see http://technet.microsoft.com/en-us/library/cc742472(WS.10).aspx#BKMK_3
+
+#function Get-WindowsUserRightsAssignment {
+function Get-LocalSecurityPolicyInformation {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
+		[String]
+		$Computer
+		,
+		[Parameter(Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
+		[String[]]
+		$Policy 
+	)
+	try {
+		$RightsAssignment = $null
+		$Account = $null
+		$SecurityIdentifier = $null
+		$NTAccount = $null
+
+		Invoke-Command -ScriptBlock { &psexec \\$Computer cmd "/C `"secedit /export /cfg %TMP%\rights.inf /quiet && type %TMP%\rights.inf && del %TMP%\rights.inf`"" } | 
+		Where-Object { $_ -ilike 'se* = *' } | 
+		ForEach-Object {
+			$RightsAssignment = $_.Split('=')
+
+			if ($Policy -icontains $RightsAssignment[0].Trim()) {
+				$Account = @()
+
+				$RightsAssignment[1].Trim().Split(',') | ForEach-Object {
+					if ($_ -ilike '`*S-*') {
+						$SecurityIdentifier = New-Object -TypeName System.Security.Principal.SecurityIdentifier -ArgumentList $_.Replace('*','')
+						$NTAccount = $SecurityIdentifier.Translate([System.Security.Principal.NTAccount])
+						$Account += $NTAccount.Value
+					} else {
+						$Account += $_
+					}
+				}
+
+				Write-Output (
+					New-Object -TypeName psobject -Property @{
+						Policy = $RightsAssignment[0].Trim()
+						Account = $Account
+					}
+				) 
+			}
+		}
+	}
+	catch {
+		Throw
+	}
+}
 
 
 

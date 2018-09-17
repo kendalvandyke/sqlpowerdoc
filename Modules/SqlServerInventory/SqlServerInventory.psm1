@@ -1,9 +1,3 @@
-<#
-TODO:
-- Support for converting UTC times to local timezone?
-#>
-
-
 ######################
 # CONSTANTS
 ######################
@@ -32,10 +26,23 @@ New-Variable -Name XlNumFmtNumberS2 -Value '#,##0.00;@' -Scope Script -Option Co
 New-Variable -Name XlNumFmtNumberS3 -Value '#,##0.000;@' -Scope Script -Option Constant
 
 
+# SQL Versions
+# See http://social.technet.microsoft.com/wiki/contents/articles/783.sql-server-versions.aspx for version timeline
+# Also see http://support.microsoft.com/kb/321185
+# Also see http://sqlserverbuilds.blogspot.com/
+
+New-Object -TypeName System.Version -ArgumentList '7.0.0.0' | New-Variable -Name SQLServer7 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '8.0.0.0' | New-Variable -Name SQLServer2000 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '9.0.0.0' | New-Variable -Name SQLServer2005 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '10.0.0.0' | New-Variable -Name SQLServer2008 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '10.50.0.0' | New-Variable -Name SQLServer2008R2 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '11.0.0.0' | New-Variable -Name SQLServer2012 -Scope Script -Option Constant
+
+
 ######################
 # SCRIPT VARIABLES
 ######################
-New-Object -TypeName System.Version -ArgumentList '1.0.1.0' | New-Variable -Name ModuleVersion -Scope Script -Option Constant -Visibility Private
+New-Object -TypeName System.Version -ArgumentList '1.0.2.0' | New-Variable -Name ModuleVersion -Scope Script -Option Constant -Visibility Private
 
 New-Variable -Name LogQueue -Value $null -Scope Script -Visibility Private
 
@@ -1074,11 +1081,11 @@ function Get-SqlServerInventory {
 		# Fallback in case value isn't supplied or somehow missing from the environment variables
 		if (-not $MaxConcurrencyThrottle) { $MaxConcurrencyThrottle = 1 }
 
-
 		Write-SqlServerInventoryLog -Message "Start Function: $($MyInvocation.InvocationName)" -MessageLevel Debug
 		Write-Progress -Activity 'SQL Server Inventory' -PercentComplete 0 -Status 'Discovering SQL Server Instances' -Id $MasterProgressId -ParentId $ParentProgressId
 
 		Write-SqlServerInventoryLog -Message 'Beginning SQL Server Inventory' -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "`t-LoggingPreference: $(Get-SqlServerInventoryLoggingPreference)" -MessageLevel Information
 
 		switch ($PsCmdlet.ParameterSetName) {
 			'dns' {
@@ -1833,7 +1840,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					(
 						$_.GranteeType -ieq 'Server Role' -and
 						$_.PermissionType -ine 'VIEW ANY DATABASE'
-					) -or 
+					) -and
 					(
 						$_.GranteeType -ieq 'Endpoint' -and
 						$_.PermissionType -ine 'CONNECT' -and
@@ -5876,7 +5883,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
 			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Configuration.Permissions | Where-Object { $_.PermissionType } } | Measure-Object).Count + 1
-			$ColumnCount = 11
+			$ColumnCount = 12
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
 			$Col = 0
@@ -5891,6 +5898,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Grantee Type'
 			$WorksheetData[0,$Col++] = 'Granted By'
 			$WorksheetData[0,$Col++] = 'Grantor Type'
+			$WorksheetData[0,$Col++] = 'Definition'
 
 			$Row = 1
 			$SqlServerInventory.DatabaseServer | Sort-Object -Property @{Expression={$_.Server.Configuration.General.Name}} | ForEach-Object {
@@ -5899,6 +5907,22 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 				$_.Server.Configuration.Permissions | Where-Object { $_.PermissionType } | 
 				Sort-Object -Property ObjectClass, ObjectName, PermissionState, PermissionType, Grantee | ForEach-Object {
+
+					$ObjectName = $_.ObjectName
+					$ObjectName = switch ($_.ObjectClass) {
+						'Availability Group' { " ON AVAILABILITY GROUP :: $ObjectName" }
+						'Endpoint' { " ON ENDPOINT :: $ObjectName" }
+						'Login' { " ON LOGIN :: $ObjectName" }
+						'Server Role' { " ON SERVER ROLE :: $ObjectName" }
+						'Server' { [String]::Empty }
+					}
+
+					if ($_.PermissionState -ieq 'Grant With Grant') {
+						$Definition = '{0} {1}{2} TO [{3}] WITH GRANT OPTION;' -f $_.PermissionState.ToUpper(), $_.PermissionType, $ObjectName, $_.Grantee
+					} else {
+						$Definition = '{0} {1}{2} TO [{3}];' -f $_.PermissionState.ToUpper(), $_.PermissionType, $ObjectName, $_.Grantee
+					}
+
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.ObjectClass
@@ -5911,6 +5935,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					$WorksheetData[$Row,$Col++] = $_.GranteeType
 					$WorksheetData[$Row,$Col++] = $_.Grantor
 					$WorksheetData[$Row,$Col++] = $_.GrantorType
+					$WorksheetData[$Row,$Col++] = $Definition
 					$Row++
 				}
 			}
@@ -5943,7 +5968,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor #$ServerTabColor
 
 			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Security.Logins | Where-Object { $_.Sid } }) | Measure-Object).Count + 1
-			$ColumnCount = 20
+			$ColumnCount = 21
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
 			$Col = 0
@@ -5967,6 +5992,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Is System Object'
 			$WorksheetData[0,$Col++] = 'Password Is Blank'
 			$WorksheetData[0,$Col++] = 'Password Is Login Name'
+			$WorksheetData[0,$Col++] = 'Members'
 
 
 			$Row = 1
@@ -5996,6 +6022,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					$WorksheetData[$Row,$Col++] = $_.IsSystemObject
 					$WorksheetData[$Row,$Col++] = $_.HasBlankPassword
 					$WorksheetData[$Row,$Col++] = $_.HasNameAsPassword
+					$WorksheetData[$Row,$Col++] = ($_.Member | Where-Object { $_.Sid } | ForEach-Object { $_.NTAccountName } | Sort-Object) -join $Delimiter
 					$Row++
 				}
 			}
@@ -6030,7 +6057,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor #$ServerTabColor
 
 			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Security.ServerRoles | Where-Object { $_.Name } }) | Measure-Object).Count + 1
-			$ColumnCount = 8
+			$ColumnCount = 9
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
 			$Col = 0
@@ -6042,13 +6069,23 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'IsFixedRole'
 			$WorksheetData[0,$Col++] = 'Members'
 			$WorksheetData[0,$Col++] = 'Member Of'
+			$WorksheetData[0,$Col++] = 'Member Definition'
 
 			$Row = 1
 			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
+				$ServerVersion = New-Object -TypeName System.Version -ArgumentList $_.Server.Configuration.General.Version
 
 				$_.Server.Security.ServerRoles | Where-Object { $_.Name } | ForEach-Object {
+
+					if ($ServerVersion.CompareTo($SQLServer2012) -ge 0) {
+						$Definition = "ALTER SERVER ROLE [$($_.Name)] ADD MEMBER [{0}];"
+					}
+					else {
+						$Definition = "EXEC sp_addsrvrolemember N'{0}', N'$($_.Name)';"
+					} 
+
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.Name
@@ -6057,10 +6094,12 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					$WorksheetData[$Row,$Col++] = $_.Owner
 					$WorksheetData[$Row,$Col++] = $_.IsFixedRole
 					$WorksheetData[$Row,$Col++] = ($_.Member | Sort-Object) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.Member is $NULL
-					$WorksheetData[$Row,$Col++] = ($_.MemberOf | Sort-Object) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.MemberOf is NUL
-
-					#$WorksheetData[$Row,$Col++] = if (@($_.Member).Count -gt 0) { [String]::Join($Delimiter, ($_.Member | Sort-Object)) } else { [String]::Empty }
-					#$WorksheetData[$Row,$Col++] = if (@($_.MemberOf).Count -gt 0) { [String]::Join($Delimiter, ($_.MemberOf | Sort-Object)) } else { [String]::Empty }
+					$WorksheetData[$Row,$Col++] = ($_.MemberOf | Sort-Object) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.MemberOf is NULL
+					$WorksheetData[$Row,$Col++] = (
+						$_.Member | Where-Object { -not [String]::IsNullOrEmpty($_) } | Sort-Object | ForEach-Object {
+							$Definition -f @($_)
+						}
+					) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.MemberOf is NULL
 					$Row++
 				}
 
@@ -6581,7 +6620,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Worksheet.Name = 'SVR Objects - Linked Svr Logins'
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.LinkedServers | ForEach-Object { $_.Security | Where-Object { $_.LocalLogin } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.LinkedServers | ForEach-Object { $_.Security | Where-Object { $_.LocalLogin -or $_.RemoteUser } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6602,7 +6641,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 					$LinkedServerName = $_.General.Name
 
-					$_.Security | Where-Object { $_.LocalLogin } | ForEach-Object {
+					$_.Security | Where-Object { $_.LocalLogin -or $_.RemoteUser } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $LinkedServerName
@@ -8436,7 +8475,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
 			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Properties.Permissions | Where-Object { $_.PermissionType } } } ) | Measure-Object).Count + 1
-			$ColumnCount = 12
+			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
 			$Col = 0
@@ -8452,6 +8491,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Grantee Type'
 			$WorksheetData[0,$Col++] = 'Granted By'
 			$WorksheetData[0,$Col++] = 'Grantor Type'
+			$WorksheetData[0,$Col++] = 'Definition'
 
 			$Row = 1
 			$SqlServerInventory.DatabaseServer | Sort-Object -Property @{Expression={$_.Server.Configuration.General.Name}} | ForEach-Object {
@@ -8464,6 +8504,49 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 					$_.Properties.Permissions | Where-Object { $_.PermissionType } | 
 					Sort-Object -Property ObjectClass, ObjectName, PermissionState, PermissionType, Grantee | ForEach-Object {
+
+						$SchemaName = $_.ObjectSchema
+
+						# If the object class is an object or a column then figure out the permissions; otherwise we'll get to them in a second
+						$ObjectName = if ($_.ObjectClass -ieq 'Object Or Column') {
+							if (-not [String]::IsNullOrEmpty($_.ColumnName)) {
+								" ON [$SchemaName].[$($_.ObjectName)] ([$($_.ColumnName)])"
+							} else {
+								" ON [$SchemaName].[$($_.ObjectName)]"
+							}
+						} else {
+							$_.ObjectName
+						}
+						
+						$ObjectName = switch ($_.ObjectClass) {
+							'SQL Assembly'	{ " ON ASSEMBLY :: $ObjectName" }
+							'Asymmetric Key'	{ " ON ASYMMETRIC KEY :: $ObjectName" }
+							'Certificate'	{ " ON CERTIFICATE :: $ObjectName" }
+							'User'	{ " ON USER :: $ObjectName" }
+							'Database Role'	{ " ON ROLE :: $ObjectName" }
+							'Application Role'	{ " ON APPLICATION ROLE :: $ObjectName" }
+							'Full-Text Catalog'	{ " ON FULLTEXT CATALOG :: $ObjectName" }
+							'Full-Text Stop List'	{ " ON FULLTEXT STOPLIST :: $ObjectName" }
+							'Object Or Column'	{ $ObjectName }
+							'Schema'	{ " ON SCHEMA :: $ObjectName" }
+							'Service Contract'	{ " ON CONTRACT :: $ObjectName" }
+							'Message Type'	{ " ON MESSAGE TYPE :: $ObjectName" }
+							'Remote Service Binding'	{ " ON REMOTE SERVICE BINDING :: $ObjectName" }
+							'Service Route'	{ " ON ROUTE :: $ObjectName" }
+							'Service'	{ " ON SERVICE :: $ObjectName" }
+							'Symmetric Key'	{ " ON SYMMETRIC KEY :: $ObjectName" }
+							'User Defined Type'	{ " ON TYPE :: [$SchemaName].[$ObjectName]" }
+							'XML Namespace'	{ " ON XML SCHEMA COLLECTION :: [$SchemaName].[$ObjectName]" }
+							'Database'	{ [String]::Empty }
+							default	{ 'UNKNOWN' }
+						}
+
+						if ($_.PermissionState -ieq 'Grant With Grant') {
+							$Definition = '{0} {1}{2} TO [{3}] WITH GRANT OPTION;' -f $_.PermissionState.ToUpper(), $_.PermissionType, $ObjectName, $_.Grantee
+						} else {
+							$Definition = '{0} {1}{2} TO [{3}];' -f $_.PermissionState.ToUpper(), $_.PermissionType, $ObjectName, $_.Grantee
+						}
+
 
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
@@ -8478,6 +8561,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$WorksheetData[$Row,$Col++] = $_.GranteeType
 						$WorksheetData[$Row,$Col++] = $_.Grantor
 						$WorksheetData[$Row,$Col++] = $_.GrantorType
+						$WorksheetData[$Row,$Col++] = $Definition
 						$Row++
 					} 
 				}
@@ -8684,17 +8768,27 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Last Modified Date'
 			$WorksheetData[0,$Col++] = 'Members'
 			$WorksheetData[0,$Col++] = 'Member Of'
+			$WorksheetData[0,$Col++] = 'Member Definition'
 
 			$Row = 1
 			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
+				$ServerVersion = New-Object -TypeName System.Version -ArgumentList $_.Server.Configuration.General.Version
 
 				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
 					$_.Security.DatabaseRole | Where-Object { $_.ID } | ForEach-Object { 
+
+						if ($ServerVersion.CompareTo($SQLServer2012) -ge 0) {
+							$Definition = "ALTER ROLE [$($_.Name)] ADD MEMBER [{0}];"
+						}
+						else {
+							$Definition = "EXEC sp_addrolemember N'$($_.Name)', N'{0}';"
+						}
+						
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -8704,7 +8798,13 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$WorksheetData[$Row,$Col++] = $_.CreateDate
 						$WorksheetData[$Row,$Col++] = $_.DateLastModified
 						$WorksheetData[$Row,$Col++] = ($_.Member | Sort-Object) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.Member is $NULL
-						$WorksheetData[$Row,$Col++] = ($_.MemberOf | Sort-Object) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.MemberOf is NUL
+						$WorksheetData[$Row,$Col++] = ($_.MemberOf | Sort-Object) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.MemberOf is NULL
+						$WorksheetData[$Row,$Col++] = (
+							$_.Member | Where-Object { -not [String]::IsNullOrEmpty($_) } | Sort-Object | ForEach-Object {
+								$Definition -f @($_)
+							}
+						) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.MemberOf is NULL
+						
 						$Row++
 					} 
 				}
@@ -10234,109 +10334,109 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 				$Worksheet.Activate() | Out-Null
 
 				# Bold the header row
-				#$Duration = (Measure-Command {
-				$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Debug
 
 				# Bold the 1st column
-				#$Duration = (Measure-Command {
-				$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Debug
 
 				# Freeze View
-				#$Duration = (Measure-Command {
-				$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
-				$Worksheet.Application.ActiveWindow.FreezePanes = $true 
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
+						$Worksheet.Application.ActiveWindow.FreezePanes = $true 
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Debug
 
 
 				# Apply Column formatting
-				#$Duration = (Measure-Command {
-				$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-					$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+							$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Apply Row formatting
-				#$Duration = (Measure-Command {
-				$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-					$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+							$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Update worksheet values so row and column formatting apply
-				#$Duration = (Measure-Command {
-				try {
-					$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
-				} catch {
-					# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
-					# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
-					# See http://support.microsoft.com/kb/313275 for more information
-					# When this happens the workaround is to try doing the work in smaller chunks
-					# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
-					$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-						$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
-					}
-					$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-						$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
-					}
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						try {
+							$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
+						} catch {
+							# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
+							# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
+							# See http://support.microsoft.com/kb/313275 for more information
+							# When this happens the workaround is to try doing the work in smaller chunks
+							# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
+							$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+								$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
+							}
+							$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+								$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
+							}
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Debug
 
 
 				# Apply table formatting
-				#$Duration = (Measure-Command {
-				$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
-				$ListObject.Name = "Table $WorksheetNumber"
-				$ListObject.TableStyle = $TableStyle
-				$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
-				$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
+						$ListObject.Name = "Table $WorksheetNumber"
+						$ListObject.TableStyle = $TableStyle
+						$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
+						$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Zoom back to 80%
-				#$Duration = (Measure-Command {
-				$Worksheet.Application.ActiveWindow.Zoom = 80
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Application.ActiveWindow.Zoom = 80
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Debug
 
 				# Adjust the column widths to 250 before autofitting contents
 				# This allows longer lines of text to remain on one line
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Debug
 
 				# Autofit column and row contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
-				$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
+						$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Left align contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Vertical align contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Put the selection back to the upper left cell
-				#$Duration = (Measure-Command {
-				$Worksheet.Range('A1').Select() | Out-Null
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Range('A1').Select() | Out-Null
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Debug
 			}
 
 		}
@@ -10363,7 +10463,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 		$ProgressStatus = 'Output to Excel complete'
 		Write-Progress -Activity $ProgressActivity -PercentComplete 100 -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId -Completed
 		Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Information
-		Write-SqlServerInventoryLog -Message "End Function: $($MyInvocation.InvocationName)" -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "End Function: $($MyInvocation.InvocationName)" -MessageLevel Debug
 
 
 		# Cleanup
@@ -10738,115 +10838,115 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 				$Worksheet.Activate() | Out-Null
 
 				# Bold the header row
-				#$Duration = (Measure-Command {
-				$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Debug
 
 				# Bold the 1st column
-				#$Duration = (Measure-Command {
-				$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Debug
 
 				# Freeze View
-				#$Duration = (Measure-Command {
-				$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
-				$Worksheet.Application.ActiveWindow.FreezePanes = $true 
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
+						$Worksheet.Application.ActiveWindow.FreezePanes = $true 
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Debug
 
 
 				# Apply Column formatting
-				#$Duration = (Measure-Command {
-				$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-					$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
-				}
-				#}).TotalMilliseconds
-				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+							$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Apply Row formatting
-				#$Duration = (Measure-Command {
-				$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-					$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+							$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Update worksheet values so row and column formatting apply
-				#$Duration = (Measure-Command {
-				try {
-					$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
-				} catch {
-					# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
-					# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
-					# See http://support.microsoft.com/kb/313275 for more information
-					# When this happens the workaround is to try doing the work in smaller chunks
-					# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
-					$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-						$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
-					}
-					$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-						$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
-					}
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						try {
+							$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
+						} catch {
+							# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
+							# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
+							# See http://support.microsoft.com/kb/313275 for more information
+							# When this happens the workaround is to try doing the work in smaller chunks
+							# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
+							$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+								$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
+							}
+							$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+								$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
+							}
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Debug
 
 
 				# Apply table formatting
-				#$Duration = (Measure-Command {
-				$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
-				$ListObject.Name = "Table $WorksheetNumber"
-				$ListObject.TableStyle = $TableStyle
-				$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
-				$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
+						$ListObject.Name = "Table $WorksheetNumber"
+						$ListObject.TableStyle = $TableStyle
+						$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
+						$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Zoom back to 80%
-				#$Duration = (Measure-Command {
-				$Worksheet.Application.ActiveWindow.Zoom = 80
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Application.ActiveWindow.Zoom = 80
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Debug
 
 				# Adjust the column widths to 150 before autofitting contents
 				# This allows longer lines of text to remain on one line
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.ColumnWidth = 150
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.ColumnWidth = 150
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Debug
 
 				# Wrap text
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.WrapText = $true
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Wrap text Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.WrapText = $true
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Wrap text Duration (ms): $Duration" -MessageLevel Debug
 
 				# Autofit column and row contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
-				$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
+						$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Left align contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Vertical align contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Put the selection back to the upper left cell
-				#$Duration = (Measure-Command {
-				$Worksheet.Range('A1').Select() | Out-Null
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Range('A1').Select() | Out-Null
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Debug
 			}
 
 		}
@@ -10870,10 +10970,10 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 
 		#endregion
 
-		$ProgressStatus = 'Output to Excel complete'
+		$ProgressStatus = 'SQL Server Inventory Database Engine Assessment Output to Excel complete'
 		Write-Progress -Activity $ProgressActivity -PercentComplete 100 -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId -Completed
 		Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Information
-		Write-SqlServerInventoryLog -Message "End Function: $($MyInvocation.InvocationName)" -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "End Function: $($MyInvocation.InvocationName)" -MessageLevel Debug
 
 
 		# Cleanup
@@ -17564,109 +17664,109 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 				$Worksheet.Activate() | Out-Null
 
 				# Bold the header row
-				#$Duration = (Measure-Command {
-				$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Debug
 
 				# Bold the 1st column
-				#$Duration = (Measure-Command {
-				$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Debug
 
 				# Freeze View
-				#$Duration = (Measure-Command {
-				$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
-				$Worksheet.Application.ActiveWindow.FreezePanes = $true 
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
+						$Worksheet.Application.ActiveWindow.FreezePanes = $true 
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Debug
 
 
 				# Apply Column formatting
-				#$Duration = (Measure-Command {
-				$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-					$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
-				}
-				#}).TotalMilliseconds
-				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+							$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Apply Row formatting
-				#$Duration = (Measure-Command {
-				$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-					$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+							$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Verbose
 
 				# Update worksheet values so row and column formatting apply
-				#$Duration = (Measure-Command {
-				try {
-					$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
-				} catch {
-					# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
-					# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
-					# See http://support.microsoft.com/kb/313275 for more information
-					# When this happens the workaround is to try doing the work in smaller chunks
-					# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
-					$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-						$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
-					}
-					$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-						$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
-					}
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						try {
+							$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
+						} catch {
+							# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
+							# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
+							# See http://support.microsoft.com/kb/313275 for more information
+							# When this happens the workaround is to try doing the work in smaller chunks
+							# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
+							$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+								$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
+							}
+							$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+								$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
+							}
+						}
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Debug
 
 
 				# Apply table formatting
-				#$Duration = (Measure-Command {
-				$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
-				$ListObject.Name = "Table $WorksheetNumber"
-				$ListObject.TableStyle = $TableStyle
-				$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
-				$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
+						$ListObject.Name = "Table $WorksheetNumber"
+						$ListObject.TableStyle = $TableStyle
+						$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
+						$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Zoom back to 80%
-				#$Duration = (Measure-Command {
-				$Worksheet.Application.ActiveWindow.Zoom = 80
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Application.ActiveWindow.Zoom = 80
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Debug
 
 				# Adjust the column widths to 250 before autofitting contents
 				# This allows longer lines of text to remain on one line
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Debug
 
 				# Autofit column and row contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
-				$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
+						$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Left align contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Vertical align contents
-				#$Duration = (Measure-Command {
-				$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Put the selection back to the upper left cell
-				#$Duration = (Measure-Command {
-				$Worksheet.Range('A1').Select() | Out-Null
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						$Worksheet.Range('A1').Select() | Out-Null
+					}).TotalMilliseconds
+				Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Debug
 			}
 
 		}
@@ -17693,7 +17793,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 		$ProgressStatus = 'Output to Excel complete'
 		Write-Progress -Activity $ProgressActivity -PercentComplete 100 -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId -Completed
 		Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Information
-		Write-SqlServerInventoryLog -Message "End Function: $($MyInvocation.InvocationName)" -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "End Function: $($MyInvocation.InvocationName)" -MessageLevel Debug
 
 
 		# Cleanup

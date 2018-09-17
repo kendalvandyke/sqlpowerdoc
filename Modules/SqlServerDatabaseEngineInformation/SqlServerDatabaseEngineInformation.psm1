@@ -46,10 +46,122 @@ New-Variable -Name PerformVolumeMaintenanceTasks -Scope Script -Value 'SeManageV
 ######################
 New-Variable -Name SmoMajorVersion -Scope Script -Value $null
 
+$LookupAccountSidDefinition = @'
+public const int NO_ERROR = 0;
+public const int ERROR_INSUFFICIENT_BUFFER = 122;
+
+public enum SID_NAME_USE : int {
+    SidTypeUser = 1,
+    SidTypeGroup,
+    SidTypeDomain,
+    SidTypeAlias,
+    SidTypeWellKnownGroup,
+    SidTypeDeletedAccount,
+    SidTypeInvalid,
+    SidTypeUnknown,
+    SidTypeComputer
+};
+
+[DllImport("advapi32.dll", CharSet=CharSet.Auto, SetLastError = true)]
+ public static extern bool LookupAccountSid(
+     string lpSystemName,
+     [MarshalAs(UnmanagedType.LPArray)] byte[] Sid,
+     System.Text.StringBuilder lpName,
+     ref uint cchName,
+     System.Text.StringBuilder ReferencedDomainName,
+     ref uint cchReferencedDomainName,
+     out SID_NAME_USE peUse);
+'@
+
+if (-not ('WindowsAPI.Authorization' -as [Type])) {
+    Add-Type -MemberDefinition $LookupAccountSidDefinition -Name Authorization -Namespace WindowsAPI -Using System.Text
+}
+
 
 ###################
 # PRIVATE FUNCTIONS
 ###################
+
+
+# http://msdn.microsoft.com/en-us/library/windows/desktop/aa379166.aspx
+function Resolve-AccountSid {
+	[CmdletBinding()]
+	[OutputType([int])]
+	Param
+	(
+		[Parameter(Mandatory=$true,
+			ValueFromPipelineByPropertyName=$true,
+			Position=0)]
+		[byte[]]
+		$Sid,
+		[Parameter(Mandatory=$false,
+			ValueFromPipelineByPropertyName=$true,
+			Position=1)]
+		[string]
+		$ComputerName = $null
+	)
+	Begin
+	{
+		$lpName = New-Object -TypeName System.Text.StringBuilder
+		$cchName = $lpName.Capacity
+		$ReferencedDomainName = New-Object -TypeName System.Text.StringBuilder
+		$cchReferencedDomainName = $ReferencedDomainName.Capacity
+		[WindowsAPI.Authorization+SID_NAME_USE]$peUse = 1
+		$LastError = [WindowsAPI.Authorization]::NO_ERROR
+	}
+	Process
+	{
+		try {
+			$Result = [WindowsAPI.Authorization]::LookupAccountSid($ComputerName, $Sid, $lpName, [ref]$cchName, $ReferencedDomainName, [ref]$cchReferencedDomainName, [ref]$peUse)
+
+			if (-not $Result) {
+				$LastError = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+				if ($LastError -eq [WindowsAPI.Authorization]::ERROR_INSUFFICIENT_BUFFER) {
+					$lpName.EnsureCapacity($cchName) | Out-Null
+					$ReferencedDomainName.EnsureCapacity($cchReferencedDomainName) | Out-Null
+					$LastError = [WindowsAPI.Authorization]::NO_ERROR
+
+					$Result = [WindowsAPI.Authorization]::LookupAccountSid($ComputerName, $Sid, $lpName, [ref]$cchName, $ReferencedDomainName, [ref]$cchReferencedDomainName, [ref]$peUse)
+
+					if (-not $Result) {
+						$LastError = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+					}
+				}
+			}
+
+			Write-Output (
+				New-Object -TypeName PSObject -Property @{
+					IsResolved = $Result
+					ReferencedDomainName = $ReferencedDomainName.ToString()
+					AccountName = $lpName
+					AccountType = [string]$(switch ($peUse) {
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeUser) { 'User' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeGroup) { 'Group' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeDomain) { 'Domain' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeAlias) { 'Alias' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeWellKnownGroup) { 'Well Known Group' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeDeletedAccount) { 'Deleted Account' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeInvalid) { 'Invalid' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeUnknown) { 'Unknown' }
+							$([WindowsAPI.Authorization+SID_NAME_USE]::SidTypeComputer) { 'Computer' }
+							default { $null }
+						})
+					ErrorCode = $LastError
+
+				}
+			)
+
+		}
+		catch {
+			# Do nothing for now...maybe something later?
+		} 
+	}
+	End
+	{
+		Remove-Variable -Name lpName, cchName, ReferencedDomainName, cchReferencedDomainName, peUse, LastError
+	}
+}
+
 
 
 function Get-TablePropertyQuery([System.Version]$ServerVersion, [String]$DatabaseEngineType, [Switch]$IncludeSystemObjects = $false) {
@@ -1919,6 +2031,124 @@ SELECT udf.id AS [FunctionID], sudf.uid AS [SchemaID], param.name AS [Name], CAS
 }
 
 
+<#
+	.SYNOPSIS
+		A brief description of the function.
+	.DESCRIPTION
+		A detailed description of the function.
+	.PARAMETER  param1
+		The description of the first parameter.
+	.EXAMPLE
+		PS C:\> Get-Foo -param1 'string value'
+	.INPUTS
+		System.String
+	.OUTPUTS
+		System.String
+	.NOTES
+		Additional information about the function goes here.
+	.LINK
+		about_functions_advanced
+	.LINK
+		about_comment_based_help
+#>
+function Get-NTGroupMemberList {
+	[CmdletBinding(DefaultParametersetName='domain')]
+	param(
+		[Parameter(Position=0, Mandatory=$true, ParameterSetName='domain')]
+		[ValidateLength(1,15)]
+		[System.String]
+		$NTDomainName
+		,
+		[Parameter(Position=0, Mandatory=$true, ParameterSetName='machine')]
+		[ValidateLength(1,15)]
+		[System.String]
+		$NTMachineName
+		,
+		[Parameter(Position=1, Mandatory=$true)]
+		[ValidateNotNullOrEmpty()]
+		[System.String]
+		$GroupName
+		,
+		[Parameter(Position=2, Mandatory=$false)]
+		[Switch]
+		$Recurse
+	)
+	begin {
+		Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+		$NTAccountType = [System.Security.Principal.NTAccount] -as [Type]
+
+		if ($PsCmdlet.ParameterSetName -ieq 'domain') {
+			$ContextType = [System.DirectoryServices.AccountManagement.ContextType]::Domain
+			$PrincipalContext = New-Object -TypeName System.DirectoryServices.AccountManagement.PrincipalContext -ArgumentList $ContextType, $NTDomainName
+		} else {
+			$ContextType = [System.DirectoryServices.AccountManagement.ContextType]::Machine
+			$PrincipalContext = New-Object -TypeName System.DirectoryServices.AccountManagement.PrincipalContext -ArgumentList $ContextType, $NTMachineName
+		}
+	}
+	process {
+		$Group = [System.DirectoryServices.AccountManagement.GroupPrincipal]::FindByIdentity($PrincipalContext,$GroupName)
+		
+		if ($Group) {
+		
+			try {
+				$Group.GetMembers($Recurse) | ForEach-Object {
+					Write-Output (
+						New-Object -TypeName PSObject -Property @{
+							AccountExpirationDate = $_.AccountExpirationDate
+							AccountLockoutTime = $_.AccountLockoutTime
+							Description = $_.Description
+							DisplayName = $_.DisplayName
+							Enabled = $_.Enabled # In Win32_UserAccount this is called "Disabled". Hooray for inconsistencies!
+							Name = $_.Name
+							SamAccountName = $_.SamAccountName
+							NTDomainName = if ($_.ContextType -ieq 'domain') { 
+								$_.Sid.Translate($NTAccountType).ToString().Split('\')[0] 
+							} elseif ($PsCmdlet.ParameterSetName -ieq 'machine') {
+								$NTMachineName
+							} else { 
+								$null 
+							}
+							NTAccountName = if ($_.ContextType -ieq 'domain') { 
+								$_.Sid.Translate($NTAccountType).ToString() 
+							} elseif ($PsCmdlet.ParameterSetName -ieq 'machine') {
+								'{0}\{1}' -f $NTMachineName, $_.SamAccountName
+							} else { 
+								$null 
+							}
+							Sid = $_.Sid
+							PrincipalType = if ($PsCmdlet.ParameterSetName -ieq 'domain') {
+								$_.StructuralObjectClass
+							} else {
+								if ($_.ContextType.ToString() -ieq 'domain') { 
+									$_.StructuralObjectClass 
+								} else { 
+									'user' 
+								}
+							}
+							ContextType = $_.ContextType.ToString()
+						}
+					)
+				}
+			}
+			catch {
+				Write-Output (
+					New-Object -TypeName PSObject -Property @{
+						Description = '*Incomplete List'
+						DisplayName = '*Incomplete List'
+						Name = '*Incomplete List'
+						NTAccountName = '*Incomplete List'
+					}
+				)
+				throw
+			}
+		} else {
+			throw 'Unable to find a group that matches the provided identity. Check that the group still exists; if not it may have been orphaned.'
+		}
+	}
+	end {
+		Remove-Variable -Name ContextType, NTAccountType, PrincipalContext, Group
+	}
+}
 
 
 function Get-AgentActivationOrderValue($ActivationOrder) {
@@ -4224,6 +4454,88 @@ function Get-ExtendedPropertyInformation {
 	}
 }
 
+
+function Get-FailoverClusterMemberList {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory=$true)] 
+		[Microsoft.SqlServer.Management.Smo.Server]
+		$Server
+	)
+	Begin {
+		$DbEngineType = [String](Get-DatabaseEngineTypeValue -DatabaseEngineType $Server.ServerType)
+	}
+	Process {
+		try {
+			if ($Server.Information.IsClustered) {
+				if (
+					$($Server.Information.Version).CompareTo($SQLServer2012) -ge 0 -and
+					$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
+				) {
+					Write-Output (
+						@() + (
+							$Server.Databases['master'].ExecuteWithResults('SELECT NodeName, Status, is_current_owner as IsCurrentOwner FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
+								New-Object -TypeName psobject -Property @{
+									Name = $_.NodeName
+									Status = switch ($_.Status) {
+										0 { 'Up' }
+										1 { 'Down' }
+										2 { 'Paused' }
+										3 { 'Joining' }
+										-1 { 'Uknown' }
+										default { 'Uknown' }
+									}
+									IsCurrentOwner = $_.IsCurrentOwner
+								}
+							}
+						)
+					)
+				} elseif (
+					$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
+					$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
+				) {
+					Write-Output (
+						$Server.Databases['master'].ExecuteWithResults('SELECT NodeName FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
+							New-Object -TypeName psobject -Property @{
+								Name = $_.NodeName
+								Status = $null
+								IsCurrentOwner = $null
+							}
+						}
+					)
+				} elseif (
+					$($Server.Information.Version).CompareTo($SQLServer2000) -ge 0 -and
+					$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
+				) {
+					Write-Output (
+						$Server.Databases['master'].ExecuteWithResults('SELECT NodeName FROM ::fn_virtualservernodes()').Tables[0].Rows | ForEach-Object {
+							New-Object -TypeName psobject -Property @{
+								Name = $_.NodeName
+								Status = $null
+								IsCurrentOwner = $null
+							}
+						}
+					)
+				}
+				else {
+					Write-Output $null
+				}
+			}
+			else {
+				Write-Output $null
+			}
+		}
+		catch {
+			throw
+		}
+	}
+	End {
+		Remove-Variable -Name DbEngineType
+	}
+}
+
+
+
 function Get-IndexInformation {
 	[CmdletBinding()]
 	param(
@@ -6481,70 +6793,33 @@ function Get-ServerConfigurationInformation {
 				HighAvailability = New-Object -TypeName psobject -Property @{
 					FailoverCluster = New-Object -TypeName psobject -Property @{
 						IsClusteredInstance = $Server.Information.IsClustered # System.Boolean IsClustered {get;}
-						Member = if (
-							$($Server.Information.Version).CompareTo($SQLServer2012) -ge 0 -and
-							$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
-						) {
-							@() + (
-								$Server.Databases['master'].ExecuteWithResults('SELECT NodeName, Status, is_current_owner as IsCurrentOwner FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
-									New-Object -TypeName psobject -Property @{
-										Name = $_.NodeName
-										Status = switch ($_.Status) {
-											0 { 'Up' }
-											1 { 'Down' }
-											2 { 'Paused' }
-											3 { 'Joining' }
-											-1 { 'Uknown' }
-											default { 'Uknown' }
-										}
-										IsCurrentOwner = $_.IsCurrentOwner
-									}
-								}
-							)
-						} elseif (
-							$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
-							$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
-						) {
-							$Server.Databases['master'].ExecuteWithResults('SELECT NodeName FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
-								New-Object -TypeName psobject -Property @{
-									Name = $_.NodeName
-									Status = $null
-									IsCurrentOwner = $null
-								}
-							}
-						} elseif (
-							$($Server.Information.Version).CompareTo($SQLServer2000) -ge 0 -and
-							$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
-						) {
-							$Server.Databases['master'].ExecuteWithResults('SELECT NodeName FROM ::fn_virtualservernodes()').Tables[0].Rows | ForEach-Object {
-								New-Object -TypeName psobject -Property @{
-									Name = $_.NodeName
-									Status = $null
-									IsCurrentOwner = $null
-								}
-							}
-						}
-						else {
+						Member = if ($Server.Information.IsClustered) { 
+							Get-FailoverClusterMemberList -Server $Server
+						} else {
 							$null
 						}
-						SharedDrive = if (
-							$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
-							$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
-						) {
-							@() + (
-								$Server.Databases['master'].ExecuteWithResults('SELECT DriveName FROM sys.dm_io_cluster_shared_drives').Tables[0].Rows | ForEach-Object {
+						SharedDrive = if ($Server.Information.IsClustered) {
+							if (
+								$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
+								$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
+							) {
+								@() + (
+									$Server.Databases['master'].ExecuteWithResults('SELECT DriveName FROM sys.dm_io_cluster_shared_drives').Tables[0].Rows | ForEach-Object {
+										$_.DriveName
+									}
+								)
+							} elseif (
+								$($Server.Information.Version).CompareTo($SQLServer2000) -ge 0 -and
+								$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
+							) {
+								$Server.Databases['master'].ExecuteWithResults('SELECT DriveName FROM ::fn_servershareddrives()').Tables[0].Rows | ForEach-Object {
 									$_.DriveName
 								}
-							)
-						} elseif (
-							$($Server.Information.Version).CompareTo($SQLServer2000) -ge 0 -and
-							$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
-						) {
-							$Server.Databases['master'].ExecuteWithResults('SELECT DriveName FROM ::fn_servershareddrives()').Tables[0].Rows | ForEach-Object {
-								$_.DriveName
 							}
-						}
-						else {
+							else {
+								$null
+							}
+						} else {
 							$null
 						}
 					}
@@ -6556,6 +6831,7 @@ function Get-ServerConfigurationInformation {
 							QuorumState = [String](Get-ClusterQuorumStateValue -ClusterQuorumState $Server.ClusterQuorumState) # Microsoft.SqlServer.Management.Smo.ClusterQuorumState ClusterQuorumState {get;}
 							QuorumType = [String](Get-ClusterQuorumTypeValue -ClusterQuorumType $Server.ClusterQuorumType) # Microsoft.SqlServer.Management.Smo.ClusterQuorumType ClusterQuorumType {get;}
 							Member = if (
+								$Server.Information.IsHadrEnabled -and
 								$($Server.Information.Version).CompareTo($SQLServer2012) -ge 0 -and 
 								$SmoMajorVersion -ge 11 -and
 								$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
@@ -6583,6 +6859,7 @@ function Get-ServerConfigurationInformation {
 								$null
 							}
 							Subnet = if (
+								$Server.Information.IsHadrEnabled -and
 								$($Server.Information.Version).CompareTo($SQLServer2012) -ge 0 -and 
 								$SmoMajorVersion -ge 11 -and
 								$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
@@ -7632,6 +7909,29 @@ function Get-SqlServerSecurityInformation {
 			$null
 		}
 
+		# Grab the NETBIOS machine name for use when resolving machine group members
+		# For SQL 2005 and up use SERVERPROPERTY(N'ComputerNamePhysicalNetBIOS')
+		# For SQL 2000 use SERVERPROPERTY(N'MachineName')
+		$NTMachineName = if (($Server.Information.Version).CompareTo($SQLServer2005) -ge 0) {
+			$Server.Databases['master'].ExecuteWithResults('SELECT SERVERPROPERTY(N''ComputerNamePhysicalNetBIOS'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
+		} else {
+			# Note that for clustered servers this will return the virtual name and not the physical machine name
+			# We'll deal with this later
+			$Server.Databases['master'].ExecuteWithResults('SELECT SERVERPROPERTY(N''MachineName'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
+		}
+
+		# If this is a clustered server get the list of cluster members
+		# We'll use this when resolving machine group members
+		$ClusterMember = if ($Server.Information.IsClustered -eq $true) {
+			Get-FailoverClusterMemberList -Server $Server | ForEach-Object {
+				Write-Output $_.Name
+			}
+		} else {
+			$null
+		}
+		
+		# Used for holding results when resolving group membership
+		$NTGroupMemberList = $null
 
 		Write-Output (
 			New-Object -TypeName psobject -Property @{
@@ -7673,6 +7973,72 @@ function Get-SqlServerSecurityInformation {
 
 							HasBlankPassword = if ($BlankPasswordLogin | Where-Object { $_.Name -ieq $LoginName }) { $true } else { $false }
 							HasNameAsPassword = if ($NameAsPasswordLogin | Where-Object { $_.Name -ieq $LoginName }) { $true } else { $false }
+
+
+							# Resolve group members for standalone instances only
+							# Ignore 'NT SERVICE\*' (it's a service SID, not an actual group that you can put members into) 
+							# Ignore 'NT AUTHORITY\*' (also not an actual group that you can put members into) 
+							Member = $(
+								if (
+									[String](Get-LoginTypeValue -LoginType $_.LoginType) -ieq 'windows group' -and
+									$DbEngineType -ieq $StandaloneDbEngine -and
+									$LoginName -inotlike 'NT SERVICE\*' -and
+									$LoginName -inotlike 'NT AUTHORITY\*'
+								) {
+									$NTGroupMemberList = @('Unable to resolve group members')
+
+									try {
+										$LoginDomain = $LoginName.Split('\')[0]
+										if (
+											$LoginDomain -ine $NTMachineName -and
+											$ClusterMember -icontains $LoginDomain
+										) {
+											$Account = Resolve-AccountSid -Sid $_.Sid -ComputerName $LoginDomain
+										} else {
+											$Account = Resolve-AccountSid -Sid $_.Sid -ComputerName $NTMachineName
+										}
+										
+										# If the SID was resolved to an account then determine if it's a domain group or a machine group
+										if ($Account.IsResolved) {
+											if ($Account.AccountType -ieq 'Group') {
+												Get-NTGroupMemberList -NTDomainName $Account.ReferencedDomainName -GroupName $Account.AccountName -OutVariable NTGroupMemberList -Recurse | Out-Null
+											} else {
+												# If the login's machine name doesn't match the server's machine name and...
+												# the login's machine name doesn't match one of the member names in the cluster (or there is no cluster)...
+												# then use the server's machine name to resolve the group
+												if (
+													$LoginDomain -ine $NTMachineName -and
+													$ClusterMember -icontains $LoginDomain
+												) {
+													Get-NTGroupMemberList -NTMachineName $NTDomainName -GroupName $Account.AccountName -OutVariable NTGroupMemberList -Recurse | Out-Null
+												} else {
+													Get-NTGroupMemberList -NTMachineName $NTMachineName -GroupName $Account.AccountName -OutVariable NTGroupMemberList -Recurse | Out-Null
+												}												
+											}											
+										} else {
+											Write-SqlServerDatabaseEngineInformationLog -Message "[$($Server.ConnectionContext.ServerInstance)] Unable to resolve group members for [$LoginName]: Error Code $($Account.ErrorCode)" -MessageLevel Warning
+										}
+									}
+									catch {
+										$ErrorRecord = $_.Exception.ErrorRecord
+										Write-SqlServerDatabaseEngineInformationLog -Message "[$($Server.ConnectionContext.ServerInstance)] Unable to resolve group members for [$LoginName]: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+										
+										# If we were able to retrieve at least a partial list of members then add a fake user called "*Partial List"
+										if (($NTGroupMemberList | Measure-Object).Count -gt 0) {
+											$NTGroupMemberList += New-Object -TypeName psobject -Property @{
+												
+											}
+										}
+										
+									}
+									finally {
+										Write-Output ($NTGroupMemberList)
+									}
+									
+								} else {
+									Write-Output @()
+								}
+							)
 
 						}
 					}
@@ -7739,7 +8105,7 @@ function Get-SqlServerSecurityInformation {
 								DateLastModified = $_.DateLastModified # System.DateTime DateLastModified {get;}
 								ID = $_.ID # System.Int32 ID {get;}
 								Identity = $_.Identity # System.String Identity {get;set;}
-								MappedClassType = $_.MappedClassType.ToString() # Microsoft.SqlServer.Management.Smo.MappedClassType MappedClassType {get;set;}
+								MappedClassType = if ($_.MappedClassType) { $_.MappedClassType.ToString() } else { $null }  # Microsoft.SqlServer.Management.Smo.MappedClassType MappedClassType {get;set;}
 								Name = $_.Name # System.String Name {get;set;}
 								#Parent = $_.Parent	# Microsoft.SqlServer.Management.Smo.Server Parent {get;set;}
 								#Properties = $_.Properties	# Microsoft.SqlServer.Management.Smo.SqlPropertyCollection Properties {get;}
@@ -7787,7 +8153,7 @@ function Get-SqlServerSecurityInformation {
 										ID = $_.ID # System.Int32 ID {get;}
 										Guid = $_.Guid # System.Guid Guid {get;set;}
 									}
-									Filter = $_.Filter # System.String Filter {get;set;}
+									'Filter' = $_.Filter # System.String Filter {get;set;}
 
 									#Parent = $_.Parent	# Microsoft.SqlServer.Management.Smo.Server Parent {get;set;}
 									#Properties = $_.Properties	# Microsoft.SqlServer.Management.Smo.SqlPropertyCollection Properties {get;}
@@ -7871,7 +8237,7 @@ function Get-ResourceGovernorInformation {
 					ClassifierFunction = $Server.ResourceGovernor.ClassifierFunction
 					ReconfigurePending = $Server.ResourceGovernor.ReconfigurePending
 					ResourcePools = @() + (
-						$Server.ResourceGovernor.ResourcePools | ForEach-Object {
+						$Server.ResourceGovernor.ResourcePools | Where-Object { $_.ID } | ForEach-Object {
 							New-Object -TypeName psobject -Property @{
 								ID = $_.ID # System.Int32 ID {get;}
 								IsSystemObject = $_.IsSystemObject # System.Boolean IsSystemObject {get;}
@@ -7886,11 +8252,11 @@ function Get-ResourceGovernorInformation {
 								#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 								#UserData = $_.UserData	# System.Object UserData {get;set;}
 								WorkloadGroups = @() + (
-									$_.WorkloadGroups | ForEach-Object {
+									$_.WorkloadGroups | Where-Object { $_.ID } | ForEach-Object {
 										New-Object -TypeName psobject -Property @{
 											GroupMaximumRequests = $_.GroupMaximumRequests # System.Int32 GroupMaximumRequests {get;set;}
 											ID = $_.ID # System.Int32 ID {get;}
-											Importance = $_.Importance.ToString() # Microsoft.SqlServer.Management.Smo.WorkloadGroupImportance Importance {get;set;}
+											Importance = if ($_.Importance) { $_.Importance.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.WorkloadGroupImportance Importance {get;set;}
 											IsSystemObject = $_.IsSystemObject # System.Boolean IsSystemObject {get;}
 											MaximumDegreeOfParallelism = $_.MaximumDegreeOfParallelism # System.Int32 MaximumDegreeOfParallelism {get;set;}
 											Name = $_.Name # System.String Name {get;set;}
@@ -7925,68 +8291,6 @@ function Get-ResourceGovernorInformation {
 		Throw
 	}
 }
-
-
-## SHOULD THIS BE PART OF THE WINDOWS INFORMATION CLASS AS OPTIONAL INFORMATION?
-## GUT FEEL - YES!!
-
-# This function is a total hackjob
-# It should be easier to do this in PowerShell but it's not
-# So we're stuck with having to Frankenstein together psExec and WMI to get it to work :-(
-# For more information on secedit see http://technet.microsoft.com/en-us/library/cc742472(WS.10).aspx#BKMK_3
-
-<#
-function Get-WindowsUserRightsAssignment {
-	[CmdletBinding()]
-	param(
-		[Parameter(Mandatory=$true)]
-		[ValidateNotNullOrEmpty()]
-		[String]
-		$Computer
-		,
-		[Parameter(Mandatory=$true)]
-		[ValidateNotNullOrEmpty()]
-		[String[]]
-		$Policy 
-	)
-	try {
-		$RightsAssignment = $null
-		$Account = $null
-		$SecurityIdentifier = $null
-		$NTAccount = $null
-
-		(			Invoke-Command -ScriptBlock { &psexec \\$Computer cmd "/C `"secedit /export /cfg %TMP%\rights.inf && type %TMP%\rights.inf && del %TMP%\rights.inf`"" }) | 
-		Where-Object { $_ -ilike 'se* = *' } | 
-		ForEach-Object {
-			$RightsAssignment = $_.Split('=')
-
-			if ($Policy -icontains $RightsAssignment[0].Trim()) {
-				$Account = @()
-
-				$RightsAssignment[1].Trim().Split(',') | ForEach-Object {
-					if ($_ -ilike '`*S-*') {
-						$SecurityIdentifier = New-Object -TypeName System.Security.Principal.SecurityIdentifier -ArgumentList $_.Replace('*','')
-						$NTAccount = $SecurityIdentifier.Translate([System.Security.Principal.NTAccount])
-						$Account += $NTAccount.Value
-					} else {
-						$Account += $_
-					}
-				}
-
-				Write-Output (
-					New-Object -TypeName psobject -Property @{
-						Policy = $RightsAssignment[0].Trim()
-						Account = $Account
-					}
-				) 
-			}
-		}
-	}
-	catch {
-		Throw
-	}
-}
-#>
 
 
 function Get-DatabaseInformation {
@@ -8132,7 +8436,6 @@ function Get-DatabaseInformation {
 						DatabaseEngineType = $DbEngineType
 						IncludeSystemObjects = $IncludeSystemObjects
 					}
-
 
 					$Tables = $_.ExecuteWithResults((Get-TablePropertyQuery @ParameterHash)).Tables[0]
 					$TableChecks = $_.ExecuteWithResults((Get-TableCheckQuery @ParameterHash)).Tables[0]
@@ -10992,14 +11295,27 @@ function Get-DatabaseMailInformation {
 
 					# For some reason SMO exposes these as name\value pairs instead of as properties
 					# As of SQL 2012 there's no mechanism to add new configuration values so I decided to go ahead and transform them here
-					ConfigurationValues = New-Object -TypeName psobject -Property @{
-						AccountRetryAttempts = $Server.Mail.ConfigurationValues['AccountRetryAttempts'].Value # System.String Value {get;set;}
-						AccountRetryDelaySeconds = $Server.Mail.ConfigurationValues['AccountRetryDelay'].Value # System.String Value {get;set;}
-						DatabaseMailExeMinimumLifeTimeSeconds = $Server.Mail.ConfigurationValues['DatabaseMailExeMinimumLifeTime'].Value # System.String Value {get;set;}
-						DefaultAttachmentEncoding = $Server.Mail.ConfigurationValues['DefaultAttachmentEncoding'].Value # System.String Value {get;set;}
-						LoggingLevel = $Server.Mail.ConfigurationValues['LoggingLevel'].Value # System.String Value {get;set;}
-						MaxFileSizeBytes = $Server.Mail.ConfigurationValues['MaxFileSize'].Value # System.String Value {get;set;}
-						ProhibitedExtensions = $Server.Mail.ConfigurationValues['ProhibitedExtensions'].Value # System.String Value {get;set;}
+					# Return NULLs if server is Express edition
+					ConfigurationValues = if ($Server.Information.Edition -inotlike 'Express*') {
+						New-Object -TypeName psobject -Property @{
+							AccountRetryAttempts = $Server.Mail.ConfigurationValues['AccountRetryAttempts'].Value # System.String Value {get;set;}
+							AccountRetryDelaySeconds = $Server.Mail.ConfigurationValues['AccountRetryDelay'].Value # System.String Value {get;set;}
+							DatabaseMailExeMinimumLifeTimeSeconds = $Server.Mail.ConfigurationValues['DatabaseMailExeMinimumLifeTime'].Value # System.String Value {get;set;}
+							DefaultAttachmentEncoding = $Server.Mail.ConfigurationValues['DefaultAttachmentEncoding'].Value # System.String Value {get;set;}
+							LoggingLevel = $Server.Mail.ConfigurationValues['LoggingLevel'].Value # System.String Value {get;set;}
+							MaxFileSizeBytes = $Server.Mail.ConfigurationValues['MaxFileSize'].Value # System.String Value {get;set;}
+							ProhibitedExtensions = $Server.Mail.ConfigurationValues['ProhibitedExtensions'].Value # System.String Value {get;set;}
+						}
+					} else {
+						New-Object -TypeName psobject -Property @{
+							AccountRetryAttempts = $null
+							AccountRetryDelaySeconds = $null
+							DatabaseMailExeMinimumLifeTimeSeconds = $null
+							DefaultAttachmentEncoding = $null
+							LoggingLevel = $null
+							MaxFileSizeBytes = $null
+							ProhibitedExtensions = $null
+						}
 					}
 
 					# 				$Server.Mail.ConfigurationValues | ForEach-Object {
@@ -11611,7 +11927,10 @@ function Get-SqlServerDatabaseEngineInformation {
 				# AGENT
 				######################
 
-				if ($ServerInformation.Server.Configuration.General.ServerType -ieq 'standalone') {
+				if (
+					$ServerInformation.Server.Configuration.General.ServerType -ieq 'standalone' -and
+					$Server.Information.Edition -inotlike 'Express*' 
+				) {
 
 					# Service
 					######################

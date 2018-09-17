@@ -1309,10 +1309,16 @@ function Find-SqlServerService {
 			$ServiceIpAddress = $null
 			$DomainName = $null
 			$ServiceTypeName = $null
-			$ServiceName = $null
+			$ManagedComputerServerInstanceName = $null
 			$Port = $null
 			$IsDynamicPort = $false
 			$ServiceStartDate = $null
+			$Protocol = $null
+			$NetbiosComputerName = if ($ComputerName.IndexOf('.') -gt 15) {
+				$ComputerName.Substring(0,15)
+			} else {
+				$ComputerName.Split('.')[0]
+			}
 
 			$StdRegProv = $null
 			$RegistryKeyRootPath = $null
@@ -1337,9 +1343,11 @@ function Find-SqlServerService {
 					if (($_.Name).IndexOf('$') -gt 0) {
 						$InstanceName = ($_.Name).Substring(($_.Name).IndexOf('$') + 1)
 						$IsNamedInstance = $true
+						$ManagedComputerServerInstanceName = $InstanceName
 					} else {
 						$InstanceName = $null
 						$IsNamedInstance = $false
+						$ManagedComputerServerInstanceName = $_.Name
 					}
 
 					# Try and determine if this is a clustered server (and the FQDN & IP for the cluster if it is)
@@ -1388,83 +1396,114 @@ function Find-SqlServerService {
 						default { $_.Type.ToString() }
 					}
 
+					# Gather protocol details for SQL Server service
+					# Not applicable to other service types
+					$ServiceIpAddress = $null
+					$Port = $null
+					$IsDynamicPort = $null
+					$ServiceProtocol = $null
 
-					# Get the port number for SQL Server Services
-					#if ($_.Type -eq $ManagedServiceTypeEnum::SqlServer) {
 					if ($ServiceTypeName -ieq 'SQL Server') {
 
-						$ServiceIpAddress = $null
-						$Port = $null
-						$IsDynamicPort = $null
-						$ServiceName = if ($IsNamedInstance -eq $true) { $InstanceName } else { $_.Name }
-						$ManagedComputer.ServerInstances | Where-Object { $_.Name -ieq $ServiceName } | ForEach-Object {
-
-							$_.ServerProtocols | Where-Object { 
-								$_.Name -ieq 'tcp' -and
-								$_.IsEnabled -eq $true
-							} | ForEach-Object {
-
-								# If listening on all IPs then get the "IPAll" port info
-								# Otherwise get port info for an IP that's enabled and active
-
-								if ($_.ProtocolProperties['ListenOnAllIPs'].Value -eq $true) {
-
-									$_.IPAddresses | Where-Object { $_.Name -ieq 'ipall' } | ForEach-Object {
-										$Port = $_.IPAddressProperties['TcpPort'].Value
-										if (-not $Port) {
-											$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
-											$IsDynamicPort = $true
-										} else {
-											$IsDynamicPort = $false
+						# Gather protocol details
+						$ServiceProtocol = $ManagedComputer.ServerInstances | Where-Object { $_.Name -ieq $ManagedComputerServerInstanceName } | ForEach-Object {
+							$_.ServerProtocols | Where-Object { -not [String]::IsNullOrEmpty($_.Name) } | ForEach-Object {
+								New-Object -TypeName PSObject -Property @{
+									Name = $_.Name
+									DisplayName = $_.DisplayName
+									IsEnabled = $_.IsEnabled
+									IPAddresses = $_.IPAddresses | Where-Object { $_.IPAddress } | ForEach-Object {
+										New-Object -TypeName PSObject -Property @{
+											Name = $_.Name
+											IpAddress = $_.IPAddress.ToString()
+											IpAddressFamily = $_.IPAddress.AddressFamily.ToString()
+											IPAddressProperties = $(
+												$IpAddressProperty = @{}
+												$_.IPAddressProperties | Where-Object {
+													-not [String]::IsNullOrEmpty($_.Name)
+												} | ForEach-Object { 
+													$IpAddressProperty += @{ $_.Name = $_.Value }
+												}
+												Write-Output $IpAddressProperty
+											)
 										}
 									}
-
-								} else {
-
-									# Start with 127.0.0.1 first in case that's the only IP that's enabled
-									$_.IPAddresses | Where-Object {
-										$_.IPAddressProperties['Active'].Value -eq $true -and 
-										$_.IPAddressProperties['Enabled'].Value -eq $true -and
-										$_.IPAddress.AddressFamily -ieq 'InterNetwork' -and
-										$_.IPAddress -ieq '127.0.0.1'
-									} | Select-Object -First 1 | ForEach-Object {
-
-										$ServiceIpAddress = $_.IPAddress.ToString()
-										$Port = $_.IPAddressProperties['TcpPort'].Value
-
-										if (-not $Port) {
-											$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
-											$IsDynamicPort = $true
-										} else {
-											$IsDynamicPort = $false
+									ProtocolProperties = $(
+										$ProtocolProperty = @{}
+										$_.ProtocolProperties | Where-Object { 
+											-not [String]::IsNullOrEmpty($_.Name) -and
+											$_.Name -ine 'Enabled' 
+										} | ForEach-Object {
+											$ProtocolProperty += @{ $_.Name = $_.Value }
 										}
-									}
-
-									# Now try and see if there's a non-loopback IP enabled
-									$_.IPAddresses | Where-Object {
-										$_.IPAddressProperties['Active'].Value -eq $true -and 
-										$_.IPAddressProperties['Enabled'].Value -eq $true -and
-										$_.IPAddress.AddressFamily -ieq 'InterNetwork' -and
-										$_.IPAddress -ine '127.0.0.1'
-									} | Select-Object -First 1 | ForEach-Object {
-
-										$ServiceIpAddress = $_.IPAddress.ToString()
-										$Port = $_.IPAddressProperties['TcpPort'].Value
-
-										if (-not $Port) {
-											$Port = $_.IPAddressProperties['TcpDynamicPorts'].Value
-											$IsDynamicPort = $true
-										} else {
-											$IsDynamicPort = $false
-										}
-									} 
+										Write-Output $ProtocolProperty
+									)
 								}
 							}
-
 						}
-					} else {
-						$Port = $null
-						$IsDynamicPort = $null
+
+						# Determine an IP Address & port the SQL Server service is listening on (if TCP/IP enabled)
+						$ServiceProtocol | Where-Object { 
+							$_.Name -ieq 'tcp' -and
+							$_.IsEnabled -eq $true
+						} | ForEach-Object {
+
+							# If listening on all IPs then get the "IPAll" port info
+							# Otherwise get port info for an IP that's enabled and active
+
+							if ($_.ProtocolProperties['ListenOnAllIPs'] -eq $true) {
+
+								$_.IPAddresses | Where-Object { $_.Name -ieq 'ipall' } | ForEach-Object {
+									$Port = $_.IPAddressProperties['TcpPort']
+									if (-not $Port) {
+										$Port = $_.IPAddressProperties['TcpDynamicPorts']
+										$IsDynamicPort = $true
+									} else {
+										$IsDynamicPort = $false
+									}
+								}
+
+							} else {
+
+								# Start with 127.0.0.1 first in case that's the only IP that's enabled
+								$_.IPAddresses | Where-Object {
+									$_.IPAddressProperties['Active'] -eq $true -and 
+									$_.IPAddressProperties['Enabled'] -eq $true -and
+									$_.IPAddressFamily -ieq 'InterNetwork' -and
+									$_.IPAddress -ieq '127.0.0.1'
+								} | Select-Object -First 1 | ForEach-Object {
+
+									$ServiceIpAddress = $_.IPAddress
+									$Port = $_.IPAddressProperties['TcpPort']
+
+									if (-not $Port) {
+										$Port = $_.IPAddressProperties['TcpDynamicPorts']
+										$IsDynamicPort = $true
+									} else {
+										$IsDynamicPort = $false
+									}
+								}
+
+								# Now try and see if there's a non-loopback IP enabled
+								$_.IPAddresses | Where-Object {
+									$_.IPAddressProperties['Active'] -eq $true -and 
+									$_.IPAddressProperties['Enabled'] -eq $true -and
+									$_.IPAddressFamily -ieq 'InterNetwork' -and
+									$_.IPAddress -ine '127.0.0.1'
+								} | Select-Object -First 1 | ForEach-Object {
+
+									$ServiceIpAddress = $_.IPAddress
+									$Port = $_.IPAddressProperties['TcpPort']
+
+									if (-not $Port) {
+										$Port = $_.IPAddressProperties['TcpDynamicPorts']
+										$IsDynamicPort = $true
+									} else {
+										$IsDynamicPort = $false
+									}
+								} 
+							}
+						}
 					}
 
 
@@ -1502,17 +1541,46 @@ function Find-SqlServerService {
 									if ($IsClusteredInstance -eq $true) {
 										[String]::Join('\', @($ClusterName, $InstanceName))
 									} else {
-										[String]::Join('\', @($ComputerName, $InstanceName))
+										if (
+											$ServiceTypeName -ine 'SQL Server' -or
+											$(
+												$ServiceProtocol | Where-Object {
+													$_.Name -ine 'sm' -and
+													$_.IsEnabled -eq $true
+												}
+											)
+										) {
+											# Another protocol besides shared memory is enabled or the service isn't SQL Server\SQL Server Agent; use the FQDN
+											[String]::Join('\', @($ComputerName, $InstanceName))
+										} else {
+											# Shared memory is the only protocol enabled; use the NETBIOS name
+											[String]::Join('\', @($NetbiosComputerName, $InstanceName))
+										}
 									}
 								} else {
 									if ($IsClusteredInstance -eq $true) {
 										$ClusterName
 									} else {
-										$ComputerName
+										if (
+											$ServiceTypeName -ine 'SQL Server' -or
+											$(
+												$ServiceProtocol | Where-Object {
+													$_.Name -ine 'sm' -and
+													$_.IsEnabled -eq $true
+												}
+											)
+										) {
+											# Another protocol besides shared memory is enabled or the service isn't SQL Server\SQL Server Agent; use the FQDN
+											$ComputerName
+										} else {
+											# Shared memory is the only protocol enabled; use the NETBIOS name
+											$NetbiosComputerName
+										}
 									}
 								}
 							)
 							ServiceIpAddress = $ServiceIpAddress
+							ServiceProtocols = $ServiceProtocol
 							ServiceStartDate = $ServiceStartDate
 							ServiceState = $_.ServiceState.ToString()
 							#ServiceType = $_.Type.ToString()
@@ -1663,6 +1731,7 @@ function Find-SqlServerService {
 										}
 									)
 									ServiceIpAddress = $ServiceIpAddress
+									ServiceProtocols = $null # TODO: Gather protocol information from registry
 									ServiceStartDate = $ServiceStartDate
 									ServiceState = $ServiceState
 									ServiceTypeName = 'SQL Server'

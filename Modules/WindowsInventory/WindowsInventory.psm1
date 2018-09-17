@@ -590,6 +590,7 @@ function Get-HotFixTitle {
 
 		Write-WindowsInventoryLog -Message "Start Function: $($MyInvocation.InvocationName)" -MessageLevel Debug
 		Write-Progress -Activity 'Retrieving Hotfix Titles' -PercentComplete 0 -Status 'Beginning retrieval' -Id $ProgressId -ParentId $ParentProgressId
+		Write-WindowsInventoryLog -Message 'Retrieving Hotfix Titles' -MessageLevel Information
 
 		$HotfixId | ForEach-Object {
 
@@ -821,10 +822,11 @@ function Export-WindowsInventoryToExcel {
 		Write-WindowsInventoryLog -Message $ProgressStatus -MessageLevel Information
 		Write-Progress -Activity $ProgressActivity -PercentComplete 0 -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
 
+
 		# Get Hotfix titles
 		$HotFixId = ($WindowsInventory.Machine | ForEach-Object { $_.Software.Patches } | ForEach-Object { $_.HotFixID }) | Select-Object -Unique | Where-Object { $_ -imatch '^(KB)?\d+$' }
 		if (($HotFixId | Measure-Object).Count -gt 0) {
-			$HotFix = Get-HotFixTitle -HotfixId $HotFixId -CacheInRegistry
+			$HotFix = Get-HotFixTitle -HotfixId $HotFixId -ParentProgressId $ParentProgressId -CacheInRegistry
 		}
 
 		Write-WindowsInventoryLog -Message 'Beginning output to Excel' -MessageLevel Information
@@ -931,10 +933,10 @@ function Export-WindowsInventoryToExcel {
 				$WorksheetData[$Row,$Col++] = (
 					$_.Hardware.Storage.DiskDrive | ForEach-Object {
 						$_.Partitions | ForEach-Object {
-							$_.LogicalDisks | ForEach-Object {
-								"{0} ({1:N2} GB); " -f $_.Caption, ($_.SizeBytes / 1GB)
-							}
+							$_.LogicalDisks | Select-Object -Property Caption, SizeBytes
 						}
+					} | Sort-Object -Property Caption | ForEach-Object {
+						'{0} ({1:N2} GB); ' -f $_.Caption, ($_.SizeBytes / 1GB)
 					}
 				)
 
@@ -1349,7 +1351,7 @@ function Export-WindowsInventoryToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(6), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -2291,6 +2293,7 @@ function Export-WindowsInventoryToExcel {
 			for ($WorksheetNumber = $WorksheetCount; $WorksheetNumber -ge 1; $WorksheetNumber--) {
 
 				$ProgressStatus = "Applying formatting to Worksheet #$($WorksheetNumber)"
+				Write-WindowsInventoryLog -Message $ProgressStatus -MessageLevel Verbose
 				Write-Progress -Activity $ProgressActivity -PercentComplete (((($WorksheetCount * 2) - $WorksheetNumber + 1) / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
 
 				$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
@@ -2299,72 +2302,115 @@ function Export-WindowsInventoryToExcel {
 				$Worksheet.Activate() | Out-Null
 
 				# Bold the header row
-				$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
+				$Duration = (Measure-Command {
+						$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Debug
 
 				# Bold the 1st column
-				$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
+				$Duration = (Measure-Command {
+						$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Debug
 
-				#Freeze 1st row & 2nd column
-				$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
-				$Worksheet.Application.ActiveWindow.FreezePanes = $true 
+				# Freeze View
+				$Duration = (Measure-Command {
+						$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
+						$Worksheet.Application.ActiveWindow.FreezePanes = $true 
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Debug
+
 
 				# Apply Column formatting
-				$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-					$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
-				}
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+							$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Apply Row formatting
-				$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-					$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
-				}
+				$Duration = (Measure-Command {
+						$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+							$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
+						}
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Update worksheet values so row and column formatting apply
-				#$Duration = (Measure-Command {
-				try {
-					$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
-				} catch {
-					# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
-					# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
-					# See http://support.microsoft.com/kb/313275 for more information
-					# When this happens the workaround is to try doing the work in smaller chunks
-					# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
-					$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
-						$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
-					}
-					$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
-						$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
-					}
-				}
-				#}).TotalMilliseconds
-				#Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Verbose
+				$Duration = (Measure-Command {
+						try {
+							$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
+						} catch {
+							# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
+							# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
+							# See http://support.microsoft.com/kb/313275 for more information
+							# When this happens the workaround is to try doing the work in smaller chunks
+							# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
+							$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
+								$Worksheet.Columns.Item($_.ColumnNumber).Value2 = $Worksheet.Columns.Item($_.ColumnNumber).Value2
+							}
+							$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
+								$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
+							}
+						}
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Debug
 
 
 				# Apply table formatting
-				$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
-				$ListObject.Name = "Table $WorksheetNumber"
-				$ListObject.TableStyle = $TableStyle
-				$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
-				$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
+				$Duration = (Measure-Command {
+						$ListObject = $Worksheet.ListObjects.Add($XlListObjectSourceType::xlSrcRange, $Worksheet.UsedRange, $null, $XlYesNoGuess::xlYes, $null) 
+						$ListObject.Name = "Table $WorksheetNumber"
+						$ListObject.TableStyle = $TableStyle
+						$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
+						$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Zoom back to 80%
-				$Worksheet.Application.ActiveWindow.Zoom = 80
+				$Duration = (Measure-Command {
+						$Worksheet.Application.ActiveWindow.Zoom = 80
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Debug
 
 				# Adjust the column widths to 250 before autofitting contents
 				# This allows longer lines of text to remain on one line
-				$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Debug
+
+				# Wrap text
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.WrapText = $true
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Wrap text Duration (ms): $Duration" -MessageLevel Debug
 
 				# Autofit column and row contents
-				$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
-				$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
+						$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Left align contents
-				$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Vertical align contents
-				$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
+				$Duration = (Measure-Command {
+						$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Put the selection back to the upper left cell
-				$Worksheet.Range('A1').Select() | Out-Null
+				$Duration = (Measure-Command {
+						$Worksheet.Range('A1').Select() | Out-Null
+					}).TotalMilliseconds
+				Write-WindowsInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Debug
 
 			}
 
