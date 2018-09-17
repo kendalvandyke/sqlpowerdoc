@@ -1643,7 +1643,7 @@ function Find-SqlServerService {
 
 							# Get Service Information
 							Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service `
-							-Filter "DisplayName = '$DisplayName'" `
+							-Filter $('DisplayName = "{0}" OR DisplayName = "SQL Server ({0})"' -f $DisplayName) `
 							-Property PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress -ErrorAction Stop | 
 							ForEach-Object {
 								$PathName = $_.PathName
@@ -1752,7 +1752,7 @@ function Find-SqlServerService {
 
 							# Get Service Information
 							Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service `
-							-Filter "DisplayName = '$DisplayName'" `
+							-Filter $('DisplayName = "{0}" OR DisplayName = "SQL Server Agent ({0})"' -f $DisplayName) `
 							-Property PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress -ErrorAction Stop | 
 							ForEach-Object {
 								$PathName = $_.PathName

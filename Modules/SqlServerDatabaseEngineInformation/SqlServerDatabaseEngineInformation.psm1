@@ -20,6 +20,7 @@ New-Object -TypeName System.Version -ArgumentList '9.0.0.0' | New-Variable -Name
 New-Object -TypeName System.Version -ArgumentList '10.0.0.0' | New-Variable -Name SQLServer2008 -Scope Script -Option Constant
 New-Object -TypeName System.Version -ArgumentList '10.50.0.0' | New-Variable -Name SQLServer2008R2 -Scope Script -Option Constant
 New-Object -TypeName System.Version -ArgumentList '11.0.0.0' | New-Variable -Name SQLServer2012 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '12.0.0.0' | New-Variable -Name SQLServer2014 -Scope Script -Option Constant
 
 New-Variable -Name StandaloneDbEngine -Scope Script -Option Constant -Value 'Standalone'
 New-Variable -Name AzureDbEngine -Scope Script -Option Constant -Value 'Windows Azure SQL Database'
@@ -30,6 +31,7 @@ New-Variable -Name AzureDbEngine -Scope Script -Option Constant -Value 'Windows 
 # 9	:	SQL 2005
 # 10:	SQL 2008 & 2008 R2 
 # 11:	SQL 2012
+# 12:	SQL 2014
 
 # Used to compare against dates\times
 [DateTime]'01/01/0001 12:00:00 AM' | New-Variable -Name SmoEpoch -Scope Script -Option Constant
@@ -74,7 +76,7 @@ public enum SID_NAME_USE : int {
 '@
 
 if (-not ('WindowsAPI.Authorization' -as [Type])) {
-    Add-Type -MemberDefinition $LookupAccountSidDefinition -Name Authorization -Namespace WindowsAPI -Using System.Text
+	Add-Type -MemberDefinition $LookupAccountSidDefinition -Name Authorization -Namespace WindowsAPI -Using System.Text
 }
 
 
@@ -2087,9 +2089,9 @@ function Get-NTGroupMemberList {
 	}
 	process {
 		$Group = [System.DirectoryServices.AccountManagement.GroupPrincipal]::FindByIdentity($PrincipalContext,$GroupName)
-		
+
 		if ($Group) {
-		
+
 			try {
 				$Group.GetMembers($Recurse) | ForEach-Object {
 					Write-Output (
@@ -4474,7 +4476,7 @@ function Get-FailoverClusterMemberList {
 				) {
 					Write-Output (
 						@() + (
-							$Server.Databases['master'].ExecuteWithResults('SELECT NodeName, Status, is_current_owner as IsCurrentOwner FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
+							$Server.ConnectionContext.ExecuteWithResults('SELECT NodeName, Status, is_current_owner as IsCurrentOwner FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
 								New-Object -TypeName psobject -Property @{
 									Name = $_.NodeName
 									Status = switch ($_.Status) {
@@ -4495,7 +4497,7 @@ function Get-FailoverClusterMemberList {
 					$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 				) {
 					Write-Output (
-						$Server.Databases['master'].ExecuteWithResults('SELECT NodeName FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
+						$Server.ConnectionContext.ExecuteWithResults('SELECT NodeName FROM sys.dm_os_cluster_nodes').Tables[0].Rows | ForEach-Object {
 							New-Object -TypeName psobject -Property @{
 								Name = $_.NodeName
 								Status = $null
@@ -4508,7 +4510,7 @@ function Get-FailoverClusterMemberList {
 					$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 				) {
 					Write-Output (
-						$Server.Databases['master'].ExecuteWithResults('SELECT NodeName FROM ::fn_virtualservernodes()').Tables[0].Rows | ForEach-Object {
+						$Server.ConnectionContext.ExecuteWithResults('SELECT NodeName FROM ::fn_virtualservernodes()').Tables[0].Rows | ForEach-Object {
 							New-Object -TypeName psobject -Property @{
 								Name = $_.NodeName
 								Status = $null
@@ -5014,7 +5016,7 @@ function Get-ServerConfigurationInformation {
 
 		# In SMO if you specify a port number on the connection $Server.Name also contains the port number
 		# To get around this "feature" I'm just executing the same statement that SMO executes against the DB Engine
-		$ServerName = $Server.Databases['master'].ExecuteWithResults('SELECT SERVERPROPERTY(N''servername'') AS ServerName').Tables[0].Rows[0].ServerName
+		$ServerName = $Server.ConnectionContext.ExecuteWithResults('SELECT SERVERPROPERTY(N''servername'') AS ServerName').Tables[0].Rows[0].ServerName
 		$DbEngineType = [String](Get-DatabaseEngineTypeValue -DatabaseEngineType $Server.ServerType)
 
 		Write-Output (
@@ -5025,7 +5027,7 @@ function Get-ServerConfigurationInformation {
 					# To get around this "feature" I'm just executing the same statement that SMO executes against the DB Engine
 					#Name = $Server.Name
 					Name = $ServerName
-					GlobalName = $Server.Databases['master'].ExecuteWithResults('SELECT @@servername AS ServerName').Tables[0].Rows[0].ServerName
+					GlobalName = $Server.ConnectionContext.ExecuteWithResults('SELECT @@servername AS ServerName').Tables[0].Rows[0].ServerName
 
 					#Product = "$($Server.Information.Product) $(Get-SqlServerVersionName -MajorVersion $Server.Information.Version.Major -MinorVersion $Server.Information.Version.Minor) ($($Server.ProductLevel)) -  $($Server.Information.VersionString) ($($Server.Platform))"
 					Product = "$($Server.Information.Product) $(Get-SqlServerVersionName -MajorVersion $Server.Information.Version.Major -MinorVersion $Server.Information.Version.Minor)"
@@ -5046,11 +5048,11 @@ function Get-ServerConfigurationInformation {
 					# Not part of the SSMS GUI but I think these properties belong here
 					ComputerName = if (($Server.Information.Version).CompareTo($SQLServer2005) -ge 0) {
 						# For SQL 2005 and up use SERVERPROPERTY(N'ComputerNamePhysicalNetBIOS')
-						$Server.Databases['master'].ExecuteWithResults('SELECT SERVERPROPERTY(N''ComputerNamePhysicalNetBIOS'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
+						$Server.ConnectionContext.ExecuteWithResults('SELECT SERVERPROPERTY(N''ComputerNamePhysicalNetBIOS'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
 					} else {
 						# For SQL 2000 use SERVERPROPERTY(N'MachineName')
 						# Note that for clustered servers this will return the virtual name and not the physical machine name
-						$Server.Databases['master'].ExecuteWithResults('SELECT SERVERPROPERTY(N''MachineName'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
+						$Server.ConnectionContext.ExecuteWithResults('SELECT SERVERPROPERTY(N''MachineName'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
 					}
 
 					ProductLevel = $Server.Information.ProductLevel # System.String ProductLevel {get;}
@@ -6804,7 +6806,7 @@ function Get-ServerConfigurationInformation {
 								$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 							) {
 								@() + (
-									$Server.Databases['master'].ExecuteWithResults('SELECT DriveName FROM sys.dm_io_cluster_shared_drives').Tables[0].Rows | ForEach-Object {
+									$Server.ConnectionContext.ExecuteWithResults('SELECT DriveName FROM sys.dm_io_cluster_shared_drives').Tables[0].Rows | ForEach-Object {
 										$_.DriveName
 									}
 								)
@@ -6812,7 +6814,7 @@ function Get-ServerConfigurationInformation {
 								$($Server.Information.Version).CompareTo($SQLServer2000) -ge 0 -and
 								$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 							) {
-								$Server.Databases['master'].ExecuteWithResults('SELECT DriveName FROM ::fn_servershareddrives()').Tables[0].Rows | ForEach-Object {
+								$Server.ConnectionContext.ExecuteWithResults('SELECT DriveName FROM ::fn_servershareddrives()').Tables[0].Rows | ForEach-Object {
 									$_.DriveName
 								}
 							}
@@ -6887,7 +6889,10 @@ function Get-ServerConfigurationInformation {
 					$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 				) {
 					@() + (
-						$Server.EnumServerPermissions() | ForEach-Object {
+						$(
+							$Server.EnumServerPermissions()
+							$Server.EnumObjectPermissions()
+						) | ForEach-Object {
 							New-Object -TypeName psobject -Property @{
 								ColumnName = $_.ColumnName # System.String ColumnName {get;}
 								Grantee = $_.Grantee # System.String Grantee {get;}
@@ -6902,25 +6907,7 @@ function Get-ServerConfigurationInformation {
 								PermissionType = $_.PermissionType.ToString() # Microsoft.SqlServer.Management.Smo.ServerPermissionSet PermissionType {get;}
 							}
 						}
-					) + (
-						$Server.EnumObjectPermissions() | ForEach-Object {
-							New-Object -TypeName psobject -Property @{
-								ColumnName = $_.ColumnName # System.String ColumnName {get;}
-								Grantee = $_.Grantee # System.String Grantee {get;}
-								GranteeType = [String](Get-PrincipalTypeValue -PrincipalType $_.GranteeType) # Microsoft.SqlServer.Management.Smo.PrincipalType GranteeType {get;}
-								Grantor = $_.Grantor # System.String Grantor {get;}
-								GrantorType = [String](Get-PrincipalTypeValue -PrincipalType $_.GrantorType) # Microsoft.SqlServer.Management.Smo.PrincipalType GrantorType {get;}
-								ObjectClass = [String](Get-ObjectClassValue -ObjectClass $_.ObjectClass) # Microsoft.SqlServer.Management.Smo.ObjectClass ObjectClass {get;}
-								ObjectID = $_.ObjectID # System.Int32 ObjectID {get;}
-								ObjectName = $_.ObjectName # System.String ObjectName {get;}
-								ObjectSchema = $_.ObjectSchema # System.String ObjectSchema {get;}
-								PermissionState = [String](Get-PermissionStateValue -PermissionState $_.PermissionState) # Microsoft.SqlServer.Management.Smo.PermissionState PermissionState {get;}
-								PermissionType = $_.PermissionType.ToString() # Microsoft.SqlServer.Management.Smo.ObjectPermissionSet PermissionType {get;}
-							}
-						}
 					)
-					# Dropping object permissions from this version because including it causes a massive memory footprint...will address later
-					# Possible solution - Use Gz compression to store the Permissions as a compressed string and decompress at rendering time
 				} else {
 					# Need to figure out how to get permissions from SQL 2000
 					$null
@@ -6953,7 +6940,7 @@ function Get-SQLTraceInformation {
 				$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
 				$DbEngineType -ieq $StandaloneDbEngine
 			) {
-				$Server.Databases['master'].ExecuteWithResults(
+				$Server.ConnectionContext.ExecuteWithResults(
 					'select id, status, path, max_size, stop_time, max_files, is_rowset, is_rollover, is_shutdown, is_default,' + `
 					' buffer_count, buffer_size, file_position, reader_spid, start_time, last_event_time, event_count, dropped_event_count' +`
 					' from sys.traces'
@@ -6984,7 +6971,7 @@ function Get-SQLTraceInformation {
 							EventCount = $_.event_count # System.Int64 event_count {get;set;}
 							DroppedEventCount = $_.dropped_event_count # System.Int32 dropped_event_count {get;set;}
 							Events = @() + (
-								$Server.Databases['master'].ExecuteWithResults(
+								$Server.ConnectionContext.ExecuteWithResults(
 									"select tcat.category_id, ei.eventid, ei.columnid, tcat.name as category_name, tcat.type as category_type, te.name as event_name, tc.name as column_name" + `
 									" from ::fn_trace_geteventinfo($($_.id)) as ei" + `
 									" inner join sys.trace_events as te on ei.eventid = te.trace_event_id" + `
@@ -7009,7 +6996,7 @@ function Get-SQLTraceInformation {
 								}
 							) 
 							Filters = @() + (
-								$Server.Databases['master'].ExecuteWithResults(
+								$Server.ConnectionContext.ExecuteWithResults(
 									"select fi.columnid, tc.name, fi.logical_operator, fi.comparison_operator, fi.value" + `
 									" from ::fn_trace_getfilterinfo($($_.id)) as fi" + `
 									" inner join sys.trace_columns as tc on fi.columnid = tc.trace_column_id" 
@@ -7285,7 +7272,7 @@ function Get-TraceFlagInformation {
 
 		# Trace Flags not supported in Azure
 		if ($DbEngineType -ieq $StandaloneDbEngine) {
-			$Server.Databases['master'].ExecuteWithResults('DBCC TRACESTATUS WITH NO_INFOMSGS').Tables[0].Rows | ForEach-Object {
+			$Server.ConnectionContext.ExecuteWithResults('DBCC TRACESTATUS WITH NO_INFOMSGS').Tables[0].Rows | ForEach-Object {
 				Write-Output (
 					New-Object -TypeName psobject -Property @{
 						TraceFlag = $_.TraceFlag # System.Int16 TraceFlag {get;set;}
@@ -7865,7 +7852,7 @@ function Get-SqlServerSecurityInformation {
 			$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
 			$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 		) {
-			$Server.Databases['master'].ExecuteWithResults(
+			$Server.ConnectionContext.ExecuteWithResults(
 				'SELECT r.name AS [RoleName], p.name AS [MemberRoleName]' + `
 				' FROM sys.server_principals r' + `
 				' INNER JOIN sys.server_role_members m ON r.principal_id = m.role_principal_id' + `
@@ -7881,13 +7868,13 @@ function Get-SqlServerSecurityInformation {
 			$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
 			$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 		) {
-			$Server.Databases['master'].ExecuteWithResults('SELECT name FROM sys.sql_logins WHERE pwdcompare('''', password_hash) = 1').Tables[0].Rows
+			$Server.ConnectionContext.ExecuteWithResults('SELECT name FROM sys.sql_logins WHERE pwdcompare('''', password_hash) = 1').Tables[0].Rows
 		} 
 		elseif (
 			$($Server.Information.Version).CompareTo($SQLServer2000) -ge 0 -and
 			$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 		) {
-			$Server.Databases['master'].ExecuteWithResults('SELECT name FROM syslogins WHERE pwdcompare('''', password) = 1').Tables[0].Rows
+			$Server.ConnectionContext.ExecuteWithResults('SELECT name FROM master.dbo.syslogins WHERE pwdcompare('''', password) = 1').Tables[0].Rows
 		}
 		else {
 			$null
@@ -7897,13 +7884,13 @@ function Get-SqlServerSecurityInformation {
 			$($Server.Information.Version).CompareTo($SQLServer2005) -ge 0 -and
 			$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 		) {
-			$Server.Databases['master'].ExecuteWithResults('SELECT name FROM sys.sql_logins WHERE pwdcompare(name, password_hash) = 1').Tables[0].Rows
+			$Server.ConnectionContext.ExecuteWithResults('SELECT name FROM sys.sql_logins WHERE pwdcompare(name, password_hash) = 1').Tables[0].Rows
 		} 
 		elseif (
 			$($Server.Information.Version).CompareTo($SQLServer2000) -ge 0 -and
 			$DbEngineType -ieq $StandaloneDbEngine # Doesn't work against Azure
 		) {
-			$Server.Databases['master'].ExecuteWithResults('SELECT name FROM syslogins WHERE pwdcompare(name, password) = 1').Tables[0].Rows
+			$Server.ConnectionContext.ExecuteWithResults('SELECT name FROM master.dbo.syslogins WHERE pwdcompare(name, password) = 1').Tables[0].Rows
 		}
 		else {
 			$null
@@ -7913,11 +7900,11 @@ function Get-SqlServerSecurityInformation {
 		# For SQL 2005 and up use SERVERPROPERTY(N'ComputerNamePhysicalNetBIOS')
 		# For SQL 2000 use SERVERPROPERTY(N'MachineName')
 		$NTMachineName = if (($Server.Information.Version).CompareTo($SQLServer2005) -ge 0) {
-			$Server.Databases['master'].ExecuteWithResults('SELECT SERVERPROPERTY(N''ComputerNamePhysicalNetBIOS'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
+			$Server.ConnectionContext.ExecuteWithResults('SELECT SERVERPROPERTY(N''ComputerNamePhysicalNetBIOS'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
 		} else {
 			# Note that for clustered servers this will return the virtual name and not the physical machine name
 			# We'll deal with this later
-			$Server.Databases['master'].ExecuteWithResults('SELECT SERVERPROPERTY(N''MachineName'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
+			$Server.ConnectionContext.ExecuteWithResults('SELECT SERVERPROPERTY(N''MachineName'') AS ComputerNamePhysicalNetBIOS').Tables[0].Rows[0].ComputerNamePhysicalNetBIOS
 		}
 
 		# If this is a clustered server get the list of cluster members
@@ -7929,7 +7916,7 @@ function Get-SqlServerSecurityInformation {
 		} else {
 			$null
 		}
-		
+
 		# Used for holding results when resolving group membership
 		$NTGroupMemberList = $null
 
@@ -7997,7 +7984,7 @@ function Get-SqlServerSecurityInformation {
 										} else {
 											$Account = Resolve-AccountSid -Sid $_.Sid -ComputerName $NTMachineName
 										}
-										
+
 										# If the SID was resolved to an account then determine if it's a domain group or a machine group
 										if ($Account.IsResolved) {
 											if ($Account.AccountType -ieq 'Group') {
@@ -8013,8 +8000,8 @@ function Get-SqlServerSecurityInformation {
 													Get-NTGroupMemberList -NTMachineName $NTDomainName -GroupName $Account.AccountName -OutVariable NTGroupMemberList -Recurse | Out-Null
 												} else {
 													Get-NTGroupMemberList -NTMachineName $NTMachineName -GroupName $Account.AccountName -OutVariable NTGroupMemberList -Recurse | Out-Null
-												}												
-											}											
+												} 
+											} 
 										} else {
 											Write-SqlServerDatabaseEngineInformationLog -Message "[$($Server.ConnectionContext.ServerInstance)] Unable to resolve group members for [$LoginName]: Error Code $($Account.ErrorCode)" -MessageLevel Warning
 										}
@@ -8022,19 +8009,22 @@ function Get-SqlServerSecurityInformation {
 									catch {
 										$ErrorRecord = $_.Exception.ErrorRecord
 										Write-SqlServerDatabaseEngineInformationLog -Message "[$($Server.ConnectionContext.ServerInstance)] Unable to resolve group members for [$LoginName]: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
-										
+
 										# If we were able to retrieve at least a partial list of members then add a fake user called "*Partial List"
 										if (($NTGroupMemberList | Measure-Object).Count -gt 0) {
 											$NTGroupMemberList += New-Object -TypeName psobject -Property @{
-												
+												Description = '*Incomplete List'
+												DisplayName = '*Incomplete List'
+												Name = '*Incomplete List'
+												NTAccountName = '*Incomplete List' 
 											}
 										}
-										
+
 									}
 									finally {
 										Write-Output ($NTGroupMemberList)
 									}
-									
+
 								} else {
 									Write-Output @()
 								}
@@ -8105,7 +8095,7 @@ function Get-SqlServerSecurityInformation {
 								DateLastModified = $_.DateLastModified # System.DateTime DateLastModified {get;}
 								ID = $_.ID # System.Int32 ID {get;}
 								Identity = $_.Identity # System.String Identity {get;set;}
-								MappedClassType = if ($_.MappedClassType) { $_.MappedClassType.ToString() } else { $null }  # Microsoft.SqlServer.Management.Smo.MappedClassType MappedClassType {get;set;}
+								MappedClassType = if ($_.MappedClassType) { $_.MappedClassType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.MappedClassType MappedClassType {get;set;}
 								Name = $_.Name # System.String Name {get;set;}
 								#Parent = $_.Parent	# Microsoft.SqlServer.Management.Smo.Server Parent {get;set;}
 								#Properties = $_.Properties	# Microsoft.SqlServer.Management.Smo.SqlPropertyCollection Properties {get;}
@@ -8944,30 +8934,8 @@ function Get-DatabaseInformation {
 
 						Permissions = if (($IsAccessible -eq $true) -and (($Server.Information.Version).CompareTo($SQLServer2005) -ge 0)) {
 							@() + $(
-								$_.EnumDatabasePermissions() | ForEach-Object {
-									New-Object -TypeName psobject -Property @{
-										ColumnName = $_.ColumnName # System.String ColumnName {get;}
-										Grantee = $_.Grantee # System.String Grantee {get;}
-										GranteeType = [String](Get-PrincipalTypeValue -PrincipalType $_.GranteeType) # Microsoft.SqlServer.Management.Smo.PrincipalType GranteeType {get;}
-										Grantor = $_.Grantor # System.String Grantor {get;}
-										GrantorType = [String](Get-PrincipalTypeValue -PrincipalType $_.GrantorType) # Microsoft.SqlServer.Management.Smo.PrincipalType GrantorType {get;}
-										ObjectClass = [String](Get-ObjectClassValue -ObjectClass $_.ObjectClass) # Microsoft.SqlServer.Management.Smo.ObjectClass ObjectClass {get;}
-										ObjectID = $_.ObjectID # System.Int32 ObjectID {get;}
-										ObjectName = if (($_.ObjectName -ieq $Server.Name) -and ($ServerName -ine $Server.Name)) { $ServerName } else { $_.ObjectName } # System.String ObjectName {get;}
-										ObjectSchema = $_.ObjectSchema # System.String ObjectSchema {get;}
-										PermissionState = [String](Get-PermissionStateValue -PermissionState $_.PermissionState) # Microsoft.SqlServer.Management.Smo.PermissionState PermissionState {get;}
-										PermissionType = if ($_.PermissionType) { $_.PermissionType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.DatabasePermissionSet PermissionType {get;}
-									}
-								}
-								if ($IncludeObjectPermissions -eq $true) {
-									# SYS and INFORMATION_SCHEMA schema only included if $IncludeSystemObjects is $true
-									$_.EnumObjectPermissions() | Where-Object { 
-										$IncludeSystemObjects -eq $true -or
-										(
-											$_.ObjectSchema -ine 'sys' -and
-											$_.ObjectSchema -ine 'INFORMATION_SCHEMA'
-										)
-									} | ForEach-Object { 
+								$(
+									$_.EnumDatabasePermissions() | ForEach-Object {
 										New-Object -TypeName psobject -Property @{
 											ColumnName = $_.ColumnName # System.String ColumnName {get;}
 											Grantee = $_.Grantee # System.String Grantee {get;}
@@ -8976,13 +8944,84 @@ function Get-DatabaseInformation {
 											GrantorType = [String](Get-PrincipalTypeValue -PrincipalType $_.GrantorType) # Microsoft.SqlServer.Management.Smo.PrincipalType GrantorType {get;}
 											ObjectClass = [String](Get-ObjectClassValue -ObjectClass $_.ObjectClass) # Microsoft.SqlServer.Management.Smo.ObjectClass ObjectClass {get;}
 											ObjectID = $_.ObjectID # System.Int32 ObjectID {get;}
-											ObjectName = $_.ObjectName # System.String ObjectName {get;}
+											ObjectName = if (($_.ObjectName -ieq $Server.Name) -and ($ServerName -ine $Server.Name)) { $ServerName } else { $_.ObjectName } # System.String ObjectName {get;}
 											ObjectSchema = $_.ObjectSchema # System.String ObjectSchema {get;}
 											PermissionState = [String](Get-PermissionStateValue -PermissionState $_.PermissionState) # Microsoft.SqlServer.Management.Smo.PermissionState PermissionState {get;}
-											PermissionType = if ($_.PermissionType) { $_.PermissionType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.ObjectPermissionSet PermissionType {get;}
+											PermissionType = if ($_.PermissionType) { $_.PermissionType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.DatabasePermissionSet PermissionType {get;}
 										}
-									} 
-								}
+									}
+									if ($IncludeObjectPermissions -eq $true) {
+
+										# In addition to object permissions, there are also permissions on the following:
+										# - Assemblies
+										# - Asymmetric Keys
+										# - Certificates
+										# - Database Principals
+										# - Fulltext Catalogs
+										# - Fulltext Stoplists
+										# - Message Types
+										# - Remote Service Bindings
+										# - Routes
+										# - Schemas
+										# - Services
+										# - Service Contracts
+										# - Symmetric Keys
+										# - Types
+										# - XML Schema Collections
+
+										$_.EnumObjectPermissions()
+										$_.Assemblies | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.AsymmetricKeys | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.Certificates | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.Users | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.ApplicationRoles | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.Roles | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.FullTextCatalogs | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.FullTextStopLists | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+
+										if ($DbEngineType -ieq $StandaloneDbEngine) {
+											$_.ServiceBroker.MessageTypes | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+											$_.ServiceBroker.RemoteServiceBindings | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+											$_.ServiceBroker.Routes | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+											$_.ServiceBroker.Services | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+											$_.ServiceBroker.ServiceContracts | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										}
+
+										$_.Schemas | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.SymmetricKeys | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+
+										if ($DbEngineType -ieq $StandaloneDbEngine) {
+											$_.UserDefinedAggregates | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										}
+										$_.UserDefinedDataTypes | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.UserDefinedTableTypes | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.UserDefinedTypes | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+										$_.XmlSchemaCollections | Where-Object { $_.ID } | ForEach-Object { $_.EnumObjectPermissions() }
+									}
+								) | Where-Object {
+
+									# SYS and INFORMATION_SCHEMA schema only included if $IncludeSystemObjects is $true
+									$IncludeSystemObjects -eq $true -or
+									(
+										$_.ObjectSchema -ine 'sys' -and
+										$_.ObjectSchema -ine 'INFORMATION_SCHEMA'
+									)
+								} | ForEach-Object { 
+									New-Object -TypeName psobject -Property @{
+										ColumnName = $_.ColumnName # System.String ColumnName {get;}
+										Grantee = $_.Grantee # System.String Grantee {get;}
+										GranteeType = [String](Get-PrincipalTypeValue -PrincipalType $_.GranteeType) # Microsoft.SqlServer.Management.Smo.PrincipalType GranteeType {get;}
+										Grantor = $_.Grantor # System.String Grantor {get;}
+										GrantorType = [String](Get-PrincipalTypeValue -PrincipalType $_.GrantorType) # Microsoft.SqlServer.Management.Smo.PrincipalType GrantorType {get;}
+										ObjectClass = [String](Get-ObjectClassValue -ObjectClass $_.ObjectClass) # Microsoft.SqlServer.Management.Smo.ObjectClass ObjectClass {get;}
+										ObjectID = $_.ObjectID # System.Int32 ObjectID {get;}
+										ObjectName = $_.ObjectName # System.String ObjectName {get;}
+										ObjectSchema = $_.ObjectSchema # System.String ObjectSchema {get;}
+										PermissionState = [String](Get-PermissionStateValue -PermissionState $_.PermissionState) # Microsoft.SqlServer.Management.Smo.PermissionState PermissionState {get;}
+										PermissionType = if ($_.PermissionType) { $_.PermissionType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.ObjectPermissionSet PermissionType {get;}
+									}
+								} 
+
 							)
 						} else {
 							# TODO: Get permissions from SQL 2000
