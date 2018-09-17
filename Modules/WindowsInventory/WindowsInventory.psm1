@@ -625,7 +625,8 @@ function Get-HotFixTitle {
 				Write-WindowsInventoryLog -Message "HotFix ID $($_.ToUpper()) not found in cache. Retrieving title from $Url" -MessageLevel Verbose
 
 				try {
-					$Title = (($WebClient.DownloadString($Url)) | Select-String -Pattern '<title>\s*(.*)\s*</title>').Matches[0].Groups[1].Value
+					#$Title = (($WebClient.DownloadString($Url)) | Select-String -Pattern '<title>\s*(.*)\s*</title>').Matches[0].Groups[1].Value
+					$Title = (($WebClient.DownloadString($Url)) | Select-String -Pattern '"heading": "(.*)",').Matches[0].Groups[1].Value
 				}
 				catch {
 					# Do nothing

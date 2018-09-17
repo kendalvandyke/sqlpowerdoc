@@ -38,6 +38,9 @@ New-Object -TypeName System.Version -ArgumentList '10.0.0.0' | New-Variable -Nam
 New-Object -TypeName System.Version -ArgumentList '10.50.0.0' | New-Variable -Name SQLServer2008R2 -Scope Script -Option Constant
 New-Object -TypeName System.Version -ArgumentList '11.0.0.0' | New-Variable -Name SQLServer2012 -Scope Script -Option Constant
 New-Object -TypeName System.Version -ArgumentList '12.0.0.0' | New-Variable -Name SQLServer2014 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '13.0.0.0' | New-Variable -Name SQLServer2016 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '14.0.0.0' | New-Variable -Name SQLServer2017 -Scope Script -Option Constant
+
 
 
 ######################
@@ -69,27 +72,27 @@ function Remove-ComObject {
 	} 
 
 	<# 
- .Synopsis 
-     Releases all <__ComObject> objects in the caller scope. 
- .Description 
-     Releases all <__ComObject> objects in the caller scope, except for those that are Read-Only or Constant. 
- .Example 
-     Remove-ComObject -Verbose 
-     Description 
-     =========== 
-     Releases <__ComObject> objects in the caller scope and displays the released COM objects' variable names. 
-.Inputs 
-     None 
- .Outputs 
-     None 
- .Notes 
-     Name:      Remove-ComObject 
-     Author:    Robert Robelo 
-     LastEdit:  01/13/2010 19:14 
- .LINK
-	 http://gallery.technet.microsoft.com/scriptcenter/d16d0c29-78a0-4d8d-9014-d66d57f51f63
+		.Synopsis 
+		Releases all <__ComObject> objects in the caller scope. 
+		.Description 
+		Releases all <__ComObject> objects in the caller scope, except for those that are Read-Only or Constant. 
+		.Example 
+		Remove-ComObject -Verbose 
+		Description 
+		=========== 
+		Releases <__ComObject> objects in the caller scope and displays the released COM objects' variable names. 
+		.Inputs 
+		None 
+		.Outputs 
+		None 
+		.Notes 
+		Name:      Remove-ComObject 
+		Author:    Robert Robelo 
+		LastEdit:  01/13/2010 19:14 
+		.LINK
+		http://gallery.technet.microsoft.com/scriptcenter/d16d0c29-78a0-4d8d-9014-d66d57f51f63
  
- #> 
+	#> 
 }
 
 
@@ -323,9 +326,9 @@ function Set-SqlServerInventoryLogQueue {
 function Get-ServerConfigurationItem([PSObject]$ServerConfigurationInformation) {
 
 	$ServerConfigurationInformation | Where-Object {
-		(			$_.PSObject.Properties | Where-Object {
+		($_.PSObject.Properties | Where-Object {
 				@('DefaultValue','RunningValue','ConfiguredValue','ConfigurationName') -icontains $_.Name
-			} | Measure-Object).Count -eq 4
+		} | Measure-Object).Count -eq 4
 	} | ForEach-Object {
 		$ServerConfigurationInformation
 	}
@@ -442,25 +445,25 @@ function Get-AssessmentFinding {
 
 function Export-SqlServerInventoryToGzClixml {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Writes a GZip compressed representation of a SQL Server Inventory returned by Get-SqlServerInventory to disk.
 
-	.DESCRIPTION
+		.DESCRIPTION
 		Uses System.IO.Compression.GZipStream to compress a SQL Server Inventory object that was returned by Get-SqlServerInventory and write it to disk.
 
-	.PARAMETER  SqlServerInventory
+		.PARAMETER  SqlServerInventory
 		A SQL Server Inventory object returned by Get-SqlServerInventory.
 
-	.PARAMETER  Path
+		.PARAMETER  Path
 		Specifies the path where the file will be written.
 
-	.EXAMPLE
+		.EXAMPLE
 		Export-SqlServerInventoryToGzClixml -SqlServerInventory $Inventory -Path 'C:\SqlServerInventory.xml.gz'
-		
-	.LINK
+
+		.LINK
 		Import-SqlServerInventoryFromGzClixml
 		Get-SqlServerInventory
-#>
+	#>
 	[CmdletBinding()]
 	param(
 		[Parameter(Position=0, Mandatory=$true, ValueFromPipeline=$true)]
@@ -569,16 +572,16 @@ function Export-SqlServerInventoryToGzClixml {
 
 			if ($($_.Server.Management.SQLTrace | Measure-Object).count -gt 0) {
 				$DatabaseServer.Server.Management = $_.Server.Management.psobject.Copy()
-				$DatabaseServer.Server.Management.SQLTrace = [System.Convert]::ToBase64String($($_.Server.Management.SQLTrace | convertto-gzclixml)) #get-compressedpsobject -inputobject $_.Server.Management.SQLTrace
+				$DatabaseServer.Server.Management.SQLTrace = [System.Convert]::ToBase64String($($_.Server.Management.SQLTrace | ConvertTo-GzCliXml)) #get-compressedpsobject -inputobject $_.Server.Management.SQLTrace
 			}
 
 			<#
-			# In testing I found that there is no advantage to compressing Agent Jobs
-			# Export time and file size were WORSE when compressing Agent Jobs
-			if ($($_.Agent.Jobs | Measure-Object).count -gt 0) {
+				# In testing I found that there is no advantage to compressing Agent Jobs
+				# Export time and file size were WORSE when compressing Agent Jobs
+				if ($($_.Agent.Jobs | Measure-Object).count -gt 0) {
 				$DatabaseServer.Agent = $_.Agent.psobject.Copy()
 				$DatabaseServer.Agent.Jobs = [System.Convert]::ToBase64String($($_.Agent.Jobs | convertto-gzclixml))
-			}
+				}
 			#>
 
 			# Compress the database server and convert it to a Base64 string
@@ -596,22 +599,22 @@ function Export-SqlServerInventoryToGzClixml {
 
 function Import-SqlServerInventoryFromGzClixml {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Imports a GZip compressed SQL Server Inventory that was written to disk by Export-SqlServerInventoryToGzClixml
 
-	.DESCRIPTION
+		.DESCRIPTION
 		Uses System.IO.Compression.GZipStream to expand a SQL Server Inventory object that was compressed and written to disk by Export-SqlServerInventoryToGzClixml.
 
-	.PARAMETER  Path
+		.PARAMETER  Path
 		Fully qualified path to the GZip compressed SQL Server Inventory written to disk by Export-SqlServerInventoryToGzClixml
 
-	.EXAMPLE
+		.EXAMPLE
 		Import-SqlServerInventoryFromGzClixml -Path 'C:\SqlServerInventory.xml.gz'
-		
-	.LINK
+
+		.LINK
 		Export-SqlServerInventoryToGzClixml
 		Get-SqlServerInventory
-#>
+	#>
 	[CmdletBinding()]
 	param(
 		[Parameter(Position=0, Mandatory=$true, ValueFromPipeline=$true)]
@@ -797,166 +800,166 @@ function Import-SqlServerInventoryFromGzClixml {
 
 function Get-SqlServerInventory {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Collects comprehensive information about SQL Server instances and their underlying Windows Operating System.
 
-	.DESCRIPTION
+		.DESCRIPTION
 		The Get-SqlServerInventory function leverages the NetworkScan, SqlServerDatabaseEngine, and WindowsInventory modules along with SQL Server Shared Management Objects (SMO) and Windows Management Instrumentation (WMI) to scan for and collect comprehensive information about SQL Server instances and their underlying Windows Operating System.
-		
+
 		Get-SqlServerInventory can find, verify, and collect information by Computer Name, Subnet Scan, or Active Directory DNS query.
-		
+
 		Get-SqlServerInventory collects information from SQL Server 2000 or higher and Windows Azure SQL Database (if using SMO 2008 or higher).
-		
+
 		This function works best when using a version of SMO that matches or is higher than the highest version of each SQL Server instance information is being collected from.
-		
+
 		The latest version of SMO can be downloaded from http://www.microsoft.com/en-us/download/details.aspx?id=29065
 		Note that SMO also requires the Microsoft SQL Server System CLR Types which can be downloaded from the same page
-				
-	.PARAMETER  DnsServer
+
+		.PARAMETER  DnsServer
 		'Automatic', or the Name or IP address of an Active Directory DNS server to query for a list of hosts to inventory (if there is an instance of SQL Server installed).
-		
+
 		When 'Automatic' is specified the function will use WMI queries to discover the current computer's DNS server(s) to query.
 
-	.PARAMETER  DnsDomain
+		.PARAMETER  DnsDomain
 		'Automatic' or the Active Directory domain name to use when querying DNS for a list of hosts.
-		
+
 		When 'Automatic' is specified the function will use the current computer's AD domain.
-		
+
 		'Automatic' will be used by default if DnsServer is specified but DnsDomain is not provided.
-		
-	.PARAMETER  Subnet
+
+		.PARAMETER  Subnet
 		'Automatic' or a comma delimited list of subnets (in CIDR notation) to scan for SQL Server instances.
-		
+
 		When 'Automatic' is specified the function will use the current computer's IP configuration to determine subnets to scan. 
-		
+
 		A quick refresher on CIDR notation:
 
-			BITS	SUBNET MASK			USABLE HOSTS PER SUBNET
-			----	---------------		-----------------------
-			/20		255.255.240.0		4094
-			/21		255.255.248.0		2046 
-			/22		255.255.252.0		1022
-			/23		255.255.254.0		510 
-			/24		255.255.255.0		254 
-			/25		255.255.255.128		126 
-			/26		255.255.255.192		62
-			/27		255.255.255.224		30
-			/28		255.255.255.240		14
-			/29		255.255.255.248		6
-			/30		255.255.255.252		2
-			/32		255.255.255.255		1		
+		BITS    SUBNET MASK        USABLE HOSTS PER SUBNET
+		----    ---------------    -----------------------
+		/20    255.255.240.0      4094
+		/21    255.255.248.0      2046
+		/22    255.255.252.0      1022
+		/23    255.255.254.0      510
+		/24    255.255.255.0      254
+		/25    255.255.255.128    126
+		/26    255.255.255.192    62
+		/27    255.255.255.224    30
+		/28    255.255.255.240    14
+		/29    255.255.255.248    6
+		/30    255.255.255.252    2
+		/32    255.255.255.255    1
 
-	.PARAMETER  ComputerName
+		.PARAMETER  ComputerName
 		A comma delimited list of computer names to inventory.
-	
-	.PARAMETER  ExcludeSubnet
+
+		.PARAMETER  ExcludeSubnet
 		A comma delimited list of subnets (in CIDR notation) to exclude when testing for connectivity.
-		
-	.PARAMETER  LimitSubnet
+
+		.PARAMETER  LimitSubnet
 		A comma delimited list of subnets (in CIDR notation) to limit the scope of connectivity tests. Only hosts with IP Addresses that fall within the specified subnet(s) will be included in the results.
 
-	.PARAMETER  ExcludeComputerName
+		.PARAMETER  ExcludeComputerName
 		A comma delimited list of computer names to exclude when testing for connectivity. Wildcards are accepted.
-		
-		An attempt will be made to resolve the IP Address(es) for each computer in this list and those addresses will also be used when determining if a host should be included or excluded when testing for connectivity.		
 
-	.PARAMETER  Username
+		An attempt will be made to resolve the IP Address(es) for each computer in this list and those addresses will also be used when determining if a host should be included or excluded when testing for connectivity.
+
+		.PARAMETER  Username
 		SQL Server username to use when connecting to instances. 
-		
+
 		Windows authentication will be used to connect if this parameter is not provided.
 
-	.PARAMETER  Password
+		.PARAMETER  Password
 		SQL Server password to use when connecting to instances.
 
-	.PARAMETER  MaxConcurrencyThrottle
+		.PARAMETER  MaxConcurrencyThrottle
 		Number between 1-100 to indicate how many instances to collect information from concurrently.
 
 		If not provided then the number of logical CPUs present to your session will be used.
 
-	.PARAMETER  PrivateOnly
+		.PARAMETER  PrivateOnly
 		Restrict inventory to instances on private class A, B, or C IP addresses
 
-	.PARAMETER  ParentProgressId
-		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID		
+		.PARAMETER  ParentProgressId
+		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID
 
-	.PARAMETER  IncludeDatabaseObjectPermissions
+		.PARAMETER  IncludeDatabaseObjectPermissions
 		Includes database object level permissions (System object permissions included only if -IncludeDatabaseSystemObjects is also provided)
 
-	.PARAMETER  IncludeDatabaseObjectInformation
+		.PARAMETER  IncludeDatabaseObjectInformation
 		Includes database object information (System objects included only if -IncludeDatabaseSystemObjects is also provided)
 
-	.PARAMETER  IncludeDatabaseSystemObjects
+		.PARAMETER  IncludeDatabaseSystemObjects
 		Include system objects when retrieving database object information. 
-		
+
 		This has no effect if neither -IncludeDatabaseObjectInformation nor -IncludeDatabaseObjectPermissions are specified.
 
 
-	.EXAMPLE
+		.EXAMPLE
 		Get-SqlServerInventory -DNSServer automatic -DNSDomain automatic -PrivateOnly
-		
+
 		Description
 		-----------
 		Collect an inventory by querying Active Directory for a list of hosts to scan for SQL Server instances. The list of hosts will be restricted to private IP addresses only.
-		
+
 		Windows Authentication will be used to connect to each instance.
-		
+
 		Database objects will NOT be included in the results.
 
-	.EXAMPLE
+		.EXAMPLE
 		Get-SqlServerInventory -Subnet 172.20.40.0/28 -Username sa -Password BetterNotBeBlank
-		
+
 		Description
 		-----------
 		Collect an inventory by scanning all hosts in the subnet 172.20.40.0/28 for SQL Server instances.
-		
+
 		SQL authentication (username = "sa", password = "BetterNotBeBlank") will be used to connect to the instance.
-		
+
 		Database objects will NOT be included in the results.
 
-	.EXAMPLE
+		.EXAMPLE
 		Get-SqlServerInventory -Computername Server1,Server2,Server3
-		
+
 		Description
 		-----------
 		Collect an inventory by scanning Server1, Server2, and Server3 for SQL Server instances.
-		
+
 		Windows Authentication will be used to connect to the instance.
-		
+
 		Database objects will NOT be included in the results.
 
 
-	.EXAMPLE
+		.EXAMPLE
 		Get-SqlServerInventory -Computername $env:COMPUTERNAME -IncludeDatabaseObjectInformation
-		
+
 		Description
 		-----------
 		Collect an inventory by scanning the local machine for SQL Server instances.
-		
+
 		Windows Authentication will be used to connect to the instance.
-		
+
 		Database objects (EXCLUDING system objects) will be included in the results.
 
-	.EXAMPLE
+		.EXAMPLE
 		Get-SqlServerInventory -Computername $env:COMPUTERNAME -IncludeDatabaseObjectInformation -IncludeDatabaseSystemObjects
 
 		Description
 		-----------
 		Collect an inventory by scanning the local machine for SQL Server instances.
-		
-		Windows Authentication will be used to connect to the instance.
-		
-		Database objects (INCLUDING system objects) will be included in the results.
-		
 
-	.OUTPUTS
+		Windows Authentication will be used to connect to the instance.
+
+		Database objects (INCLUDING system objects) will be included in the results.
+
+
+		.OUTPUTS
 		System.Management.Automation.PSObject
 
-	.NOTES
+		.NOTES
 
-	.LINK
+		.LINK
 		Export-SqlServerInventoryDatabaseEngineConfigToExcel
 
-#>
+	#>
 	[cmdletBinding(DefaultParametersetName='computername')]
 	param(
 		[Parameter(Mandatory=$true, ParameterSetName='dns', HelpMessage='DNS Server(s)')]
@@ -1040,9 +1043,9 @@ function Get-SqlServerInventory {
 			Service = @()
 			DatabaseServer = @()
 			## Eventually these can be added later
-			#	IntegrationServer = @()
-			#	AnalysisServer = @()
-			#	ReportServer = @()
+			#IntegrationServer = @()
+			#AnalysisServer = @()
+			#ReportServer = @()
 			Version = $ModuleVersion
 			StartDateUTC = [DateTime]::UtcNow
 			EndDateUTC = $null
@@ -1192,25 +1195,25 @@ function Get-SqlServerInventory {
 			#region
 			# Start-Sleep -Seconds 2
 			# Write-Output (
-			# 	New-Object -TypeName psobject -Property @{
-			# 		Server = @{
-			# 			Configuration = $null
-			# 			Databases = @()
-			# 			ServerObjects = @{
-			# 				StartupProcedures = @()
-			# 				LinkedServers = @()
-			# 			}
-			# 			Security = $null
-			# 			Service = $null
-			# 		}
-			# 		Agent = @{
-			# 			Configuration = $null
-			# 			Service = $null
-			# 			Jobs = @()
-			# 		}
-			# 		ScanDateUTC = [DateTime]::UtcNow
-			# 		ScanErrorCount = 0
-			# 	}
+			# New-Object -TypeName psobject -Property @{
+			# Server = @{
+			# Configuration = $null
+			# Databases = @()
+			# ServerObjects = @{
+			# StartupProcedures = @()
+			# LinkedServers = @()
+			# }
+			# Security = $null
+			# Service = $null
+			# }
+			# Agent = @{
+			# Configuration = $null
+			# Service = $null
+			# Jobs = @()
+			# }
+			# ScanDateUTC = [DateTime]::UtcNow
+			# ScanErrorCount = 0
+			# }
 			# )
 			#endregion
 
@@ -1253,13 +1256,13 @@ function Get-SqlServerInventory {
 			#Add the runspace into the PowerShell instance
 			$PowerShell.RunspacePool = $RunspacePool
 
-			$Runspaces.Add((
+			$null = $Runspaces.Add((
 					New-Object -TypeName PsObject -Property @{
 						PowerShell = $PowerShell
 						Runspace = $PowerShell.BeginInvoke()
 						ServiceInfo = $_
 					}
-				)) | Out-Null
+			))
 
 		}
 
@@ -1295,7 +1298,7 @@ function Get-SqlServerInventory {
 				# Simulate that there was a service even though WASD was excluded from the Services scan
 				$PowerShell.RunspacePool = $RunspacePool
 
-				$Runspaces.Add((
+				$null = $Runspaces.Add((
 						New-Object -TypeName PsObject -Property @{
 							PowerShell = $PowerShell
 							Runspace = $PowerShell.BeginInvoke()
@@ -1303,7 +1306,7 @@ function Get-SqlServerInventory {
 								InventoryServiceId = [System.Guid]::NewGuid()
 							}
 						}
-					)) | Out-Null
+				))
 			}
 		} 
 
@@ -1353,13 +1356,13 @@ function Get-SqlServerInventory {
 			Start-Sleep -Milliseconds 250
 
 			# Clean out unused runspace jobs
-			$Runspaces.clone() | Where-Object { ($_.Runspace -eq $Null) } | ForEach {
+			$Runspaces.clone() | Where-Object { ($_.Runspace -eq $null) } | ForEach-Object {
 				$Runspaces.remove($_)
 				$CurrentScanCount++
 				Write-Progress -Activity 'Scanning Instances' -PercentComplete (($CurrentScanCount / $TotalScanCount)*100) -Status "Scanned $CurrentScanCount of $TotalScanCount Instance(s)" -Id $ScanProgressId -ParentId $MasterProgressId
 			}
 
-		} while (($Runspaces | Where-Object {$_.Runspace -ne $Null} | Measure-Object).Count -gt 0)
+		} while (($Runspaces | Where-Object {$_.Runspace -ne $null} | Measure-Object).Count -gt 0)
 
 		# Finally, close the runspaces
 		$RunspacePool.close()
@@ -1465,6 +1468,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 			$ServerVersion = [System.Version]$DatabaseServer.Server.Configuration.General.Version
 			$HelpUrlModifier = switch -wildcard ($DatabaseServer.Server.Configuration.General.Version) {
+				'12.*' { '(v=sql.120)' } # SQL 2014
 				'11.*' { '(v=sql.110)' } # SQL 2012
 				'10.5' { '(v=sql.105)' } # SQL 2008 R2
 				'10.*' { '(v=sql.100)' } # SQL 2008
@@ -1551,7 +1555,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 			# Resource Governor Enabled
 			#region
 			if ($DatabaseServer.Server.Management.ResourceGovernor.Enabled -eq $true) {
-				$Details = "Resource Governor is enabled. Queries may be throttled. Make sure you understand how the Classifier Function is configured."
+				$Details = 'Resource Governor is enabled. Queries may be throttled. Make sure you understand how the Classifier Function is configured.'
 
 				Get-AssessmentFinding -ServerName $ServerName `
 				-DatabaseName $NullDatabaseName `
@@ -1771,9 +1775,9 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					@(
 						#[String]::Empty
 						<#
-						'access check cache bucket count','access check cache quota','affinity64 I/O mask','affinity64 mask',
-						'backup compression default', 'common criteria compliance enabled', 'contained database authentication',
-						'EKM provider enabled'
+							'access check cache bucket count','access check cache quota','affinity64 I/O mask','affinity64 mask',
+							'backup compression default', 'common criteria compliance enabled', 'contained database authentication',
+							'EKM provider enabled'
 						#>
 						'xp_cmdshell', 'max server memory (MB)','priority boost'
 					) -inotcontains $_.ConfigurationName
@@ -1809,7 +1813,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 			#region
 			if ($DatabaseServer.Server.Configuration.Advanced.Miscellaneous.XPCmdShellEnabled.RunningValue -eq $true) {
 
-				$Details = "xp_cmdshell is enabled. This allows a command to be passed to the operating system for execution and can be a potential security risk. Unless you know you need this feature it is recommended that you disable it. If you are using this feature consider enabling\disabling on demand or using a proxy account to mitigate the potential risks."
+				$Details = 'xp_cmdshell is enabled. This allows a command to be passed to the operating system for execution and can be a potential security risk. Unless you know you need this feature it is recommended that you disable it. If you are using this feature consider enabling\disabling on demand or using a proxy account to mitigate the potential risks.'
 
 				Get-AssessmentFinding -ServerName $ServerName `
 				-DatabaseName $NullDatabaseName `
@@ -1822,21 +1826,21 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 			#endregion
 
 
-	        # Priority Boost Enabled
-	        #region
-	        if ($DatabaseServer.Server.Configuration.Processor.BoostSqlServerPriority.RunningValue -eq $true) {
+			# Priority Boost Enabled
+			#region
+			if ($DatabaseServer.Server.Configuration.Processor.BoostSqlServerPriority.RunningValue -eq $true) {
 
-		        $Details = "Priority Boost is enabled. Although this sounds like it might help it could also cause your SQL Server to crash. Microsoft recommends that it's only enabled for very unusual circumstances - e.g. if PSS is investigating a performance issue."
+				$Details = "Priority Boost is enabled. Although this sounds like it might help it could also cause your SQL Server to crash. Microsoft recommends that it's only enabled for very unusual circumstances - e.g. if PSS is investigating a performance issue."
 
-		        Get-AssessmentFinding -ServerName $ServerName `
-		        -DatabaseName $NullDatabaseName `
-		        -Priority $MediumPriority `
-		        -Category $CatReliability `
-		        -Description 'Priority Boost Enabled' `
-		        -Details $Details `
-		        -URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms180943', $HelpUrlModifier, '.aspx')))
-	        }
-	        #endregion
+				Get-AssessmentFinding -ServerName $ServerName `
+				-DatabaseName $NullDatabaseName `
+				-Priority $MediumPriority `
+				-Category $CatReliability `
+				-Description 'Priority Boost Enabled' `
+				-Details $Details `
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms180943', $HelpUrlModifier, '.aspx')))
+			}
+			#endregion
 
 
 			# Server public Permissions
@@ -2212,8 +2216,8 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 			Get-ServerConfigurationItem -ServerConfigurationInformation $DatabaseServer.Server.Configuration | Where-Object {
 				@(
 					[String]::Empty <#,
-					'access check cache bucket count','access check cache quota','affinity64 I/O mask','affinity64 mask',
-					'backup compression default', 'common criteria compliance enabled', 'contained database authentication',
+						'access check cache bucket count','access check cache quota','affinity64 I/O mask','affinity64 mask',
+						'backup compression default', 'common criteria compliance enabled', 'contained database authentication',
 					'EKM provider enabled'#>
 				) -inotcontains $_.ConfigurationName -and
 				$_.RunningValue -ne $_.ConfiguredValue
@@ -2422,7 +2426,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				)
 			) {
 
-				$Details = "Server is configured with a CPU enabled for both the affinity mask and the affinity I/O mask. This can cause the processor to be overused and slow down performance."
+				$Details = 'Server is configured with a CPU enabled for both the affinity mask and the affinity I/O mask. This can cause the processor to be overused and slow down performance.'
 
 				Get-AssessmentFinding -ServerName $ServerName `
 				-DatabaseName $NullDatabaseName `
@@ -2551,7 +2555,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($DefaultDataPathRoot -ilike 'C:*') {
 
-					$Details = "The Default Data Path is configured to use the C: drive. This can result in newly created databases with data files on the C: drive which runs the risk of crashing the server when it runs out of space."
+					$Details = 'The Default Data Path is configured to use the C: drive. This can result in newly created databases with data files on the C: drive which runs the risk of crashing the server when it runs out of space.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $NullDatabaseName `
@@ -2632,7 +2636,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($DefaultLogPathRoot -ilike 'C:*') {
 
-					$Details = "The Default Log Path is configured to use the C: drive. This can result in newly created databases with log files on the C: drive which runs the risk of crashing the server when it runs out of space."
+					$Details = 'The Default Log Path is configured to use the C: drive. This can result in newly created databases with log files on the C: drive which runs the risk of crashing the server when it runs out of space.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $NullDatabaseName `
@@ -2697,7 +2701,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($DefaultBackupPathRoot -ilike 'C:*') {
 
-					$Details = "The Default Backup Path is configured to use the C: drive. This can result in backups on the C: drive which runs the risk of crashing the server when it runs out of space."
+					$Details = 'The Default Backup Path is configured to use the C: drive. This can result in backups on the C: drive which runs the risk of crashing the server when it runs out of space.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $NullDatabaseName `
@@ -2748,7 +2752,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					[String]::IsNullOrEmpty($DatabaseServer.Server.Configuration.DatabaseSettings.DataPath.Replace(' ', [String]::Empty))
 				) {
 
-					$Details = "The Default Data Path has not been defined. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing."
+					$Details = 'The Default Data Path has not been defined. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $NullDatabaseName `
@@ -2762,7 +2766,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 					if ([String]::IsNullOrEmpty($DefaultDataPathRoot)) {
 
-						$Details = "The Default Data Path points to an invalid location. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing."
+						$Details = 'The Default Data Path points to an invalid location. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing.'
 
 						Get-AssessmentFinding -ServerName $ServerName `
 						-DatabaseName $NullDatabaseName `
@@ -2774,7 +2778,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 					} elseif ($DatabaseServer.Server.Configuration.DatabaseSettings.DataPath -ilike '\\[a-z]*') {
 
-						$Details = "The Default Data Path is a UNC share. Although supported in 2008 R2 and higher placing data files on a UNC share may have significant performance drawbacks."
+						$Details = 'The Default Data Path is a UNC share. Although supported in 2008 R2 and higher placing data files on a UNC share may have significant performance drawbacks.'
 
 						Get-AssessmentFinding -ServerName $ServerName `
 						-DatabaseName $NullDatabaseName `
@@ -2795,7 +2799,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					[String]::IsNullOrEmpty($DatabaseServer.Server.Configuration.DatabaseSettings.LogPath.Replace(' ', [String]::Empty))
 				) {
 
-					$Details = "The Default Log Path has not been defined. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing."
+					$Details = 'The Default Log Path has not been defined. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $NullDatabaseName `
@@ -2808,7 +2812,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				} else {
 					if ([String]::IsNullOrEmpty($DefaultLogPathRoot)) {
 
-						$Details = "The Default Log Path points to an invalid location. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing."
+						$Details = 'The Default Log Path points to an invalid location. This can cause problems with creating new databases and may even prevent Cumulative Updates from installing.'
 
 						Get-AssessmentFinding -ServerName $ServerName `
 						-DatabaseName $NullDatabaseName `
@@ -2820,7 +2824,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 					} elseif ($DatabaseServer.Server.Configuration.DatabaseSettings.LogPath -ilike '\\[a-z]*') {
 
-						$Details = "The Default Log Path is a UNC share. Although supported in 2008 R2 and higher placing log files on a UNC share may have significant performance drawbacks."
+						$Details = 'The Default Log Path is a UNC share. Although supported in 2008 R2 and higher placing log files on a UNC share may have significant performance drawbacks.'
 
 						Get-AssessmentFinding -ServerName $ServerName `
 						-DatabaseName $NullDatabaseName `
@@ -2841,7 +2845,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					[String]::IsNullOrEmpty($DatabaseServer.Server.Configuration.DatabaseSettings.BackupPath.Replace(' ', [String]::Empty))
 				) {
 
-					$Details = "The Default Backup Path has not been defined. This can cause problems with backing up databases under certain conditions."
+					$Details = 'The Default Backup Path has not been defined. This can cause problems with backing up databases under certain conditions.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $NullDatabaseName `
@@ -2854,7 +2858,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				} else {
 					if ([String]::IsNullOrEmpty($DefaultBackupPathRoot)) {
 
-						$Details = "The Default Backup Path points to an invalid location. This can cause problems with backing up databases under certain conditions."
+						$Details = 'The Default Backup Path points to an invalid location. This can cause problems with backing up databases under certain conditions.'
 
 						Get-AssessmentFinding -ServerName $ServerName `
 						-DatabaseName $NullDatabaseName `
@@ -3134,7 +3138,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					$_.Properties.General.Backup.LastFullBackupDate -eq $null 
 				) {
 
-					$Details = "Database has never been backed up."
+					$Details = 'Database has never been backed up.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3150,15 +3154,15 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				# This is interesting, but not really a major concern if it's not happening
 				# Exclude master, model, tempdb, and msdb
 				#region
-				# 			if (
-				# 				@('master','model','msdb','tempdb') -notcontains $_.Name -and
-				# 				$_.Properties.General.Database.Status -ieq 'normal' -and
-				# 				$_.Properties.General.Database.IsDatabaseSnapshot -ne $true -and
-				# 				$_.Properties.General.Backup.LastFullBackupDate -ne $null -and
-				# 				$_.Properties.General.Backup.LastDifferentialBackupDate -eq $null
-				# 			) { 
-				# 				Write-Output $_.Name 
-				# 			}
+				# if (
+				# @('master','model','msdb','tempdb') -notcontains $_.Name -and
+				# $_.Properties.General.Database.Status -ieq 'normal' -and
+				# $_.Properties.General.Database.IsDatabaseSnapshot -ne $true -and
+				# $_.Properties.General.Backup.LastFullBackupDate -ne $null -and
+				# $_.Properties.General.Backup.LastDifferentialBackupDate -eq $null
+				# ) { 
+				# Write-Output $_.Name 
+				# }
 				#endregion
 
 				# No FULL backup in the week prior to the scan date
@@ -3235,7 +3239,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.Automatic.AutoClose -eq $true) {
 
-					$Details = "Database has auto-close enabled.  This setting can dramatically decrease performance."
+					$Details = 'Database has auto-close enabled.  This setting can dramatically decrease performance.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3251,7 +3255,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.Automatic.AutoShrink -eq $true) {
 
-					$Details = "Database has auto-shrink enabled.  This setting can dramatically decrease performance."
+					$Details = 'Database has auto-shrink enabled.  This setting can dramatically decrease performance.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3266,7 +3270,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				# Page Verification Not Optimal (SQL 2005 and higher)
 				#region
 				if (
-				    $ServerVersion.CompareTo($SQLServer2005) -ge 0 -and                     
+					$ServerVersion.CompareTo($SQLServer2005) -ge 0 -and                     
 					$_.Name -ine 'tempdb' -and
 					$_.Properties.Options.OtherOptions.Recovery.PageVerify -ine 'CHECKSUM'
 				) {
@@ -3281,12 +3285,12 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					-Details $Details `
 					-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/bb402873', $HelpUrlModifier, '.aspx')))
 				} 
-                # Page Verification Not Optimal (SQL 2000 and prior)
-                elseif (
-				    $ServerVersion.CompareTo($SQLServer2005) -lt 0 -and                     
+				# Page Verification Not Optimal (SQL 2000 and prior)
+				elseif (
+					$ServerVersion.CompareTo($SQLServer2005) -lt 0 -and                     
 					$_.Name -ine 'tempdb' -and
 					$_.Properties.Options.OtherOptions.Recovery.PageVerify -ine 'TORN_PAGE_DETECTION'                    
-                ) {
+				) {
 
 					$Details = "Database has $($_.Properties.Options.OtherOptions.Recovery.PageVerify) for page verification. SQL Server may have a harder time recognizing and recovering from storage corruption. Consider enabling TORN_PAGE_DETECTION instead."
 
@@ -3304,7 +3308,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.Automatic.AutoCreateStatistics -ne $true) {
 
-					$Details = "Database has auto-create-stats disabled. SQL Server uses statistics to build better execution plans, and without the ability to automatically create more, performance may suffer."
+					$Details = 'Database has auto-create-stats disabled. SQL Server uses statistics to build better execution plans, and without the ability to automatically create more, performance may suffer.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3320,7 +3324,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.Automatic.AutoUpdateStatistics -ne $true) {
 
-					$Details = "Database has auto-update-stats disabled. SQL Server uses statistics to build better execution plans, and without the ability to automatically create more, performance may suffer."
+					$Details = 'Database has auto-update-stats disabled. SQL Server uses statistics to build better execution plans, and without the ability to automatically create more, performance may suffer.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3336,7 +3340,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.Automatic.AutoUpdateStatisticsAsync -eq $true) {
 
-					$Details = "Database has auto-update-stats-async enabled. When SQL Server gets a query for a table with out-of-date statistics, it will run the query with the stats it has - while updating stats to make later queries better. The initial run of the query may suffer, though."
+					$Details = 'Database has auto-update-stats-async enabled. When SQL Server gets a query for a table with out-of-date statistics, it will run the query with the stats it has - while updating stats to make later queries better. The initial run of the query may suffer, though.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3352,7 +3356,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.Miscellaneous.Parameterization -ieq 'forced') {
 
-					$Details = "Database has forced parameterization enabled. SQL Server will aggressively reuse query execution plans even if the applications do not parameterize their queries.  This can be a performance booster with some programming languages, or it may use universally bad execution plans when better alternatives are available for certain parameters."
+					$Details = 'Database has forced parameterization enabled. SQL Server will aggressively reuse query execution plans even if the applications do not parameterize their queries.  This can be a performance booster with some programming languages, or it may use universally bad execution plans when better alternatives are available for certain parameters.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3371,7 +3375,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					$_.Properties.General.Database.ReplicationOptions -ine 'none'
 				) {
 
-					$Details = "Database is a replication publisher, subscriber, or distributor."
+					$Details = 'Database is a replication publisher, subscriber, or distributor.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3387,7 +3391,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.Miscellaneous.DateCorrelationOptimization -eq $true) {
 
-					$Details = "Database has date correlation enabled.  This is not a default setting, and it has some performance overhead.  It tells SQL Server that date fields in two tables are related, and SQL Server maintains statistics showing that relation."
+					$Details = 'Database has date correlation enabled.  This is not a default setting, and it has some performance overhead.  It tells SQL Server that date fields in two tables are related, and SQL Server maintains statistics showing that relation.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3403,7 +3407,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				#region
 				if ($_.Properties.Options.OtherOptions.State.EncryptionEnabled -eq $true) {
 
-					$Details = "Database has Transparent Data Encryption enabled.  Make absolutely sure you have backed up the certificate and private key, or else you will not be able to restore this database."
+					$Details = 'Database has Transparent Data Encryption enabled.  Make absolutely sure you have backed up the certificate and private key, or else you will not be able to restore this database.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3430,7 +3434,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					).Count -gt 0
 				) {
 
-					$Details = "System database has a file on the C: drive. Putting system databases on the C: drive runs the risk of crashing the server when it runs out of space."
+					$Details = 'System database has a file on the C: drive. Putting system databases on the C: drive runs the risk of crashing the server when it runs out of space.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3457,9 +3461,9 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					$Details = if (
 						$( $_.Properties.Files.DatabaseFiles | Where-Object { $_.Growth -gt 0 } | Measure-Object).Count -gt 0
 					) {
-						"The tempdb database has files on the C: drive. TempDB frequently grows unpredictably, putting your server at risk of running out of C: drive space and crashing hard. C: is also often much slower than other drives, so performance may be suffering."
+						'The tempdb database has files on the C: drive. TempDB frequently grows unpredictably, putting your server at risk of running out of C: drive space and crashing hard. C: is also often much slower than other drives, so performance may be suffering.'
 					} else {
-						"The tempdb database has files on the C: drive. TempDB is not set to Autogrow, hopefully it is big enough. C: is also often much slower than other drives, so performance may be suffering."
+						'The tempdb database has files on the C: drive. TempDB is not set to Autogrow, hopefully it is big enough. C: is also often much slower than other drives, so performance may be suffering.'
 					}
 
 					Get-AssessmentFinding -ServerName $ServerName `
@@ -3484,7 +3488,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					).Count -gt 0
 				) {
 
-					$Details = "Database has a file on the C: drive. Putting databases on the C: drive runs the risk of crashing the server when it runs out of space."
+					$Details = 'Database has a file on the C: drive. Putting databases on the C: drive runs the risk of crashing the server when it runs out of space.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3567,7 +3571,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					)
 				} | Select-Object -First 1 | ForEach-Object {
 
-					$Details = "Database has multiple data files in one filegroup, but they are not all set up to grow in identical amounts.  This can lead to uneven file activity inside the filegroup."
+					$Details = 'Database has multiple data files in one filegroup, but they are not all set up to grow in identical amounts.  This can lead to uneven file activity inside the filegroup.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3625,7 +3629,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					).Count -gt 0
 				) {
 
-					$Details = "Database is using percent filegrowth settings. This can lead to out of control filegrowth."
+					$Details = 'Database is using percent filegrowth settings. This can lead to out of control filegrowth.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3659,6 +3663,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				# Last good DBCC CHECKDB over 2 weeks old
 				#region
 				if (
+                    @('tempdb') -notcontains $_.Name -and
 					$_.Properties.General.Database.Status -ieq 'normal' -and
 					$_.Properties.General.Database.IsDatabaseSnapshot -ne $true -and
 					$_.Properties.General.Database.LastKnownGoodDbccDate -ne $null -and
@@ -3680,12 +3685,13 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				# DBCC CHECKDB never run sucessfully
 				#region
 				if (
+                    @('tempdb') -notcontains $_.Name -and
 					$_.Properties.General.Database.Status -ieq 'normal' -and
 					$_.Properties.General.Database.IsDatabaseSnapshot -ne $true -and
 					$_.Properties.General.Database.LastKnownGoodDbccDate -eq $null
 				) {
 
-					$Details = "Database has never had a successful DBCC CHECKDB. This check should be run regularly to catch any database corruption as soon as possible. Note: you can restore a backup of a busy production database to a test server and run DBCC CHECKDB against that to minimize impact. If you do that, you can ignore this warning."
+					$Details = 'Database has never had a successful DBCC CHECKDB. This check should be run regularly to catch any database corruption as soon as possible. Note: you can restore a backup of a busy production database to a test server and run DBCC CHECKDB against that to minimize impact. If you do that, you can ignore this warning.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3738,7 +3744,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 						}
 					} | Select-Object -First 1 | ForEach-Object {
 
-						$Details = "Database has a transaction log file larger than a data file. This may indicate that transaction log backups are not being performed or not performed often enough."
+						$Details = 'Database has a transaction log file larger than a data file. This may indicate that transaction log backups are not being performed or not performed often enough.'
 
 						Get-AssessmentFinding -ServerName $ServerName `
 						-DatabaseName $DatabaseName `
@@ -3833,7 +3839,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					}
 				) {
 
-					$Details = "The Master database contains user created tables. Tables in this database may not be restored in the event of a disaster."
+					$Details = 'The Master database contains user created tables. Tables in this database may not be restored in the event of a disaster.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3855,7 +3861,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					}
 				) {
 
-					$Details = "The MSDB database contains user created tables. Tables in this database may not be restored in the event of a disaster."
+					$Details = 'The MSDB database contains user created tables. Tables in this database may not be restored in the event of a disaster.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3877,7 +3883,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					}
 				) {
 
-					$Details = "The Model database contains user created tables. Any new database created on this instance will contain a copy of these tables."
+					$Details = 'The Model database contains user created tables. Any new database created on this instance will contain a copy of these tables.'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3897,7 +3903,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					}
 				) {
 
-					$Details = "Database has file(s) that are offline"
+					$Details = 'Database has file(s) that are offline'
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -4090,7 +4096,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					$($DatabaseServer.Server.Security.ServerRoles | Where-Object { 
 							$_.Name -ieq 'sysadmin' -and
 							$_.Member -icontains $DatabaseOwner
-						} | Measure-Object).count -ge 1
+					} | Measure-Object).count -ge 1
 				) {
 					$Details = "Database is set to trustworthy and the database owner is also a member of the sysadmin fixed server role. Database users with the right permissions can to elevate privileges to the sysadmin role and create unsafe assemblies which can compromise the server. Consider changing the database owner to a non-sysadmin or disable the trustworthy bit if it's not needed."
 
@@ -4198,91 +4204,91 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 function Export-SqlServerInventoryToExcel {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Writes an Excel file containing the information in a SQL Server Inventory.
 
-	.DESCRIPTION
+		.DESCRIPTION
 		The Export-SqlServerInventoryToExcel function uses COM Interop to write Excel files containing the information in a SQL Server Inventory returned by Get-SqlServerInventory.
-		
+
 		Although the SQL Server Shared Management Objects (SMO) libraries are required to perform an inventory they are NOT required to write the Excel files.
-		
+
 		Microsoft Excel 2007 or higher must be installed in order to write the Excel files.
-		
-	.PARAMETER  SqlServerInventory
+
+		.PARAMETER  SqlServerInventory
 		A SQL Server Inventory object returned by Get-SqlServerInventory.
-		
-	.PARAMETER  DirectoryPath
+
+		.PARAMETER  DirectoryPath
 		Specifies the directory path where the Excel files will be written.
-		
+
 		If not specified then the default is your "My Documents" folder.
-		
-	.PARAMETER  BaseFilename
+
+		.PARAMETER  BaseFilename
 		Specifies the base name to be used for each Excel file that is written.
-		
+
 		If not specified then the default is "SQL Server Inventory".
 
-	.PARAMETER  ColorTheme
+		.PARAMETER  ColorTheme
 		An Office Theme Color to apply to each worksheet. If not specified or if an unknown theme color is provided the default "Office" theme colors will be used.
-		
+
 		Office 2013 theme colors include: Aspect, Blue Green, Blue II, Blue Warm, Blue, Grayscale, Green Yellow, Green, Marquee, Median, Office, Office 2007 - 2010, Orange Red, Orange, Paper, Red Orange, Red Violet, Red, Slipstream, Violet II, Violet, Yellow Orange, Yellow
-		
+
 		Office 2010 theme colors include: Adjacency, Angles, Apex, Apothecary, Aspect, Austin, Black Tie, Civic, Clarity, Composite, Concourse, Couture, Elemental, Equity, Essential, Executive, Flow, Foundry, Grayscale, Grid, Hardcover, Horizon, Median, Metro, Module, Newsprint, Office, Opulent, Oriel, Origin, Paper, Perspective, Pushpin, Slipstream, Solstice, Technic, Thatch, Trek, Urban, Verve, Waveform
 
 		Office 2007 theme colors include: Apex, Aspect, Civic, Concourse, Equity, Flow, Foundry, Grayscale, Median, Metro, Module, Office, Opulent, Oriel, Origin, Paper, Solstice, Technic, Trek, Urban, Verve
-		
-	.PARAMETER  ColorScheme
+
+		.PARAMETER  ColorScheme
 		The color theme to apply to each worksheet. Valid values are "Light", "Medium", and "Dark". 
-		
+
 		If not specified then "Medium" is used as the default value .
-		
-	.PARAMETER  ParentProgressId
-		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID			
-		
-	.EXAMPLE
+
+		.PARAMETER  ParentProgressId
+		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID
+
+		.EXAMPLE
 		Export-SqlServerInventoryToExcel -SqlServerInventory $Inventory 
-		
+
 		Description
 		-----------
 		Write a SQL Server inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbooks will be written to your "My Documents" folder.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
-		
-	.EXAMPLE
+
+		.EXAMPLE
 		Export-SqlServerInventoryToExcel -SqlServerInventory $Inventory -DirectoryPath 'C:\DB Engine Inventory.xlsx'
-		
+
 		Description
 		-----------
 		Write a SQL Server inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbooks will be written to the "C:\DB Engine Inventory\" directory.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
 
-	.EXAMPLE
+		.EXAMPLE
 		Export-SqlServerInventoryToExcel -SqlServerInventory $Inventory -ColorTheme Blue -ColorScheme Dark
-		
+
 		Description
 		-----------
 		Write a SQL Server inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbooks will be written to your "My Documents" folder.
-		
+
 		The Blue color theme and Dark color scheme will be used.
-	
-	.NOTES
+
+		.NOTES
 		Blue and Green are nice looking Color Themes for Office 2013
 
 		Waveform is a nice looking Color Theme for Office 2010
 
-	.LINK
+		.LINK
 		Get-SqlServerInventory
 		Get-SqlServerInventoryDatabaseEngineAssessment
 		Export-SqlServerInventoryWindowsInventoryToExcel
 		Export-SqlServerInventoryDatabaseEngineConfigToExcel
 		Export-SqlServerInventoryDatabaseEngineAssessmentToExcel
-#>
+	#>
 	[cmdletBinding()]
 	param(
 		[Parameter(Mandatory=$true)]
@@ -4364,83 +4370,83 @@ function Export-SqlServerInventoryToExcel {
 
 function Export-SqlServerInventoryWindowsInventoryToExcel {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Writes an Excel file containing the Windows Inventory information in a SQL Server Inventory.
 
-	.DESCRIPTION
+		.DESCRIPTION
 		The Export-SqlServerInventoryWindowsInventoryToExcel function uses COM Interop to write an Excel file containing the Windows Inventory information returned by Get-SqlServerInventory.
-		
+
 		This function is a wrapper to Export-SqlServerInventoryToExcel in the WindowsInventory module.
-		
+
 		Microsoft Excel 2007 or higher must be installed in order to write the Excel file.
-		
-	.PARAMETER  SqlServerInventory
+
+		.PARAMETER  SqlServerInventory
 		A SQL Server Inventory object returned by Get-SqlServerInventory.
-		
-	.PARAMETER  Path
+
+		.PARAMETER  Path
 		Specifies the path where the Excel file will be written. This is a fully qualified path to a .XLSX file.
-		
+
 		If not specified then the file is named "SQL Server Inventory - [Year][Month][Day][Hour][Minute] - Windows.xlsx" and is written to your "My Documents" folder.
 
-	.PARAMETER  ColorTheme
+		.PARAMETER  ColorTheme
 		An Office Theme Color to apply to each worksheet. If not specified or if an unknown theme color is provided the default "Office" theme colors will be used.
-		
+
 		Office 2013 theme colors include: Aspect, Blue Green, Blue II, Blue Warm, Blue, Grayscale, Green Yellow, Green, Marquee, Median, Office, Office 2007 - 2010, Orange Red, Orange, Paper, Red Orange, Red Violet, Red, Slipstream, Violet II, Violet, Yellow Orange, Yellow
-		
+
 		Office 2010 theme colors include: Adjacency, Angles, Apex, Apothecary, Aspect, Austin, Black Tie, Civic, Clarity, Composite, Concourse, Couture, Elemental, Equity, Essential, Executive, Flow, Foundry, Grayscale, Grid, Hardcover, Horizon, Median, Metro, Module, Newsprint, Office, Opulent, Oriel, Origin, Paper, Perspective, Pushpin, Slipstream, Solstice, Technic, Thatch, Trek, Urban, Verve, Waveform
 
 		Office 2007 theme colors include: Apex, Aspect, Civic, Concourse, Equity, Flow, Foundry, Grayscale, Median, Metro, Module, Office, Opulent, Oriel, Origin, Paper, Solstice, Technic, Trek, Urban, Verve
-		
-	.PARAMETER  ColorScheme
+
+		.PARAMETER  ColorScheme
 		The color theme to apply to each worksheet. Valid values are "Light", "Medium", and "Dark". 
-		
+
 		If not specified then "Medium" is used as the default value .
-		
-	.PARAMETER  ParentProgressId
-		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID			
-		
-	.EXAMPLE
+
+		.PARAMETER  ParentProgressId
+		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID
+
+		.EXAMPLE
 		Export-SqlServerInventoryWindowsInventoryToExcel -SqlServerInventory $Inventory 
-		
+
 		Description
 		-----------
 		Write a Windows inventory using $Inventory.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
-		
-	.EXAMPLE
+
+		.EXAMPLE
 		Export-SqlServerInventoryWindowsInventoryToExcel -SqlServerInventory $Inventory -Path 'C:\Windows Inventory.xlsx'
-		
+
 		Description
 		-----------
 		Write a Windows inventory using $Inventory.
 
 		The Excel workbook will be written to your C:\Windows Inventory.xlsx.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
 
-	.EXAMPLE
+		.EXAMPLE
 		Export-SqlServerInventoryWindowsInventoryToExcel -SqlServerInventory $Inventory -ColorTheme Blue -ColorScheme Dark
-		
+
 		Description
 		-----------
 		Write a Windows inventory using $Inventory.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Blue color theme and Dark color scheme will be used.
-	
-	.NOTES
+
+		.NOTES
 		Blue and Green are nice looking Color Themes for Office 2013
 
 		Waveform is a nice looking Color Theme for Office 2010
 
-	.LINK
+		.LINK
 		Get-SqlServerInventory
 
-#>
+	#>
 	[cmdletBinding()]
 	param(
 		[Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -4474,83 +4480,83 @@ function Export-SqlServerInventoryWindowsInventoryToExcel {
 
 function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Writes an Excel file containing the Database Engine information in a SQL Server Inventory.
 
-	.DESCRIPTION
+		.DESCRIPTION
 		The Export-SqlServerInventoryDatabaseEngineConfigToExcel function uses COM Interop to write an Excel file containing the Database Engine information in a SQL Server Inventory returned by Get-SqlServerInventory.
-		
+
 		Although the SQL Server Shared Management Objects (SMO) libraries are required to perform an inventory they are NOT required to write the Excel file.
-		
+
 		Microsoft Excel 2007 or higher must be installed in order to write the Excel file.
-		
-	.PARAMETER  SqlServerInventory
+
+		.PARAMETER  SqlServerInventory
 		A SQL Server Inventory object returned by Get-SqlServerInventory.
-		
-	.PARAMETER  Path
+
+		.PARAMETER  Path
 		Specifies the path where the Excel file will be written. This is a fully qualified path to a .XLSX file.
-		
+
 		If not specified then the file is named "SQL Server Inventory - [Year][Month][Day][Hour][Minute] - Database Engine.xlsx" and is written to your "My Documents" folder.
 
-	.PARAMETER  ColorTheme
+		.PARAMETER  ColorTheme
 		An Office Theme Color to apply to each worksheet. If not specified or if an unknown theme color is provided the default "Office" theme colors will be used.
-		
+
 		Office 2013 theme colors include: Aspect, Blue Green, Blue II, Blue Warm, Blue, Grayscale, Green Yellow, Green, Marquee, Median, Office, Office 2007 - 2010, Orange Red, Orange, Paper, Red Orange, Red Violet, Red, Slipstream, Violet II, Violet, Yellow Orange, Yellow
-		
+
 		Office 2010 theme colors include: Adjacency, Angles, Apex, Apothecary, Aspect, Austin, Black Tie, Civic, Clarity, Composite, Concourse, Couture, Elemental, Equity, Essential, Executive, Flow, Foundry, Grayscale, Grid, Hardcover, Horizon, Median, Metro, Module, Newsprint, Office, Opulent, Oriel, Origin, Paper, Perspective, Pushpin, Slipstream, Solstice, Technic, Thatch, Trek, Urban, Verve, Waveform
 
 		Office 2007 theme colors include: Apex, Aspect, Civic, Concourse, Equity, Flow, Foundry, Grayscale, Median, Metro, Module, Office, Opulent, Oriel, Origin, Paper, Solstice, Technic, Trek, Urban, Verve
-		
-	.PARAMETER  ColorScheme
+
+		.PARAMETER  ColorScheme
 		The color theme to apply to each worksheet. Valid values are "Light", "Medium", and "Dark". 
-		
+
 		If not specified then "Medium" is used as the default value .
-		
-	.PARAMETER  ParentProgressId
-		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID			
-		
-	.EXAMPLE
+
+		.PARAMETER  ParentProgressId
+		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID
+
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineConfigToExcel -SqlServerInventory $Inventory 
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
-		
-	.EXAMPLE
+
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineConfigToExcel -SqlServerInventory $Inventory -Path 'C:\DB Engine Inventory.xlsx'
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbook will be written to your C:\DB Engine Inventory.xlsx.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
 
-	.EXAMPLE
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineConfigToExcel -SqlServerInventory $Inventory -ColorTheme Blue -ColorScheme Dark
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Blue color theme and Dark color scheme will be used.
-	
-	.NOTES
+
+		.NOTES
 		Blue and Green are nice looking Color Themes for Office 2013
 
 		Waveform is a nice looking Color Theme for Office 2010
 
-	.LINK
+		.LINK
 		Get-SqlServerInventory
 
-#>
+	#>
 	[cmdletBinding()]
 	param(
 		[Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -4584,30 +4590,30 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 
 		<#
-	.LINK
-		"Export Windows PowerShell Data to Excel" (http://technet.microsoft.com/en-us/query/dd297620)
-		
-	.LINK
-		"Microsoft.Office.Interop.Excel Namespace" (http://msdn.microsoft.com/en-us/library/office/microsoft.office.interop.excel(v=office.14).aspx)
-		
-	.LINK
-		"Excel Object Model Reference" (http://msdn.microsoft.com/en-us/library/ff846392.aspx)
-		
-	.LINK
-		"Excel 2010 Enumerations" (http://msdn.microsoft.com/en-us/library/ff838815.aspx)
-		
-	.LINK
-		"TableStyle Cheat Sheet in French/English" (http://msdn.microsoft.com/fr-fr/library/documentformat.openxml.spreadsheet.tablestyle.aspx)
-		
-	.LINK
-		"Color Palette and the 56 Excel ColorIndex Colors" (http://dmcritchie.mvps.org/excel/colors.htm)
-		
-	.LINK
-		"Adding Color to Excel 2007 Worksheets by Using the ColorIndex Property" (http://msdn.microsoft.com/en-us/library/cc296089(v=office.12).aspx)
-		
-	.LINK
-		"XlRgbColor Enumeration" (http://msdn.microsoft.com/en-us/library/ff197459.aspx)
-#>
+			.LINK
+			"Export Windows PowerShell Data to Excel" (http://technet.microsoft.com/en-us/query/dd297620)
+
+			.LINK
+			"Microsoft.Office.Interop.Excel Namespace" (http://msdn.microsoft.com/en-us/library/office/microsoft.office.interop.excel(v=office.14).aspx)
+
+			.LINK
+			"Excel Object Model Reference" (http://msdn.microsoft.com/en-us/library/ff846392.aspx)
+
+			.LINK
+			"Excel 2010 Enumerations" (http://msdn.microsoft.com/en-us/library/ff838815.aspx)
+
+			.LINK
+			"TableStyle Cheat Sheet in French/English" (http://msdn.microsoft.com/fr-fr/library/documentformat.openxml.spreadsheet.tablestyle.aspx)
+
+			.LINK
+			"Color Palette and the 56 Excel ColorIndex Colors" (http://dmcritchie.mvps.org/excel/colors.htm)
+
+			.LINK
+			"Adding Color to Excel 2007 Worksheets by Using the ColorIndex Property" (http://msdn.microsoft.com/en-us/library/cc296089(v=office.12).aspx)
+
+			.LINK
+			"XlRgbColor Enumeration" (http://msdn.microsoft.com/en-us/library/ff197459.aspx)
+		#>
 
 
 
@@ -4650,12 +4656,12 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 		$OverviewTabColor = $XlThemeColor::xlThemeColorDark1
 		$ServicesTabColor = $XlThemeColor::xlThemeColorLight1
-		# 		$ServerTabColor = $XlThemeColor::xlThemeColorAccent2
-		# 		$DatabaseTabColor = $XlThemeColor::xlThemeColorAccent4
-		# 		$SecurityTabColor = $XlThemeColor::xlThemeColorAccent3
-		# 		$ServerObjectsTabColor = $XlThemeColor::xlThemeColorAccent5
-		# 		$ManagementTabColor = $XlThemeColor::xlThemeColorAccent2
-		# 		$AgentTabColor = $XlThemeColor::xlThemeColorAccent6
+		# $ServerTabColor = $XlThemeColor::xlThemeColorAccent2
+		# $DatabaseTabColor = $XlThemeColor::xlThemeColorAccent4
+		# $SecurityTabColor = $XlThemeColor::xlThemeColorAccent3
+		# $ServerObjectsTabColor = $XlThemeColor::xlThemeColorAccent5
+		# $ManagementTabColor = $XlThemeColor::xlThemeColorAccent2
+		# $AgentTabColor = $XlThemeColor::xlThemeColorAccent6
 
 		$ServerTabColor = $XlThemeColor::xlThemeColorAccent1
 		$DatabaseTabColor = $XlThemeColor::xlThemeColorAccent2
@@ -4715,7 +4721,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 
 		# Add enough worksheets to get us to $WorksheetCount
-		$Excel.Worksheets.Add($MissingType, $Excel.Worksheets.Item($Excel.Worksheets.Count), $WorksheetCount - $Excel.Worksheets.Count, $Excel.Worksheets.Item(1).Type) | Out-Null
+		$null = $Excel.Worksheets.Add($MissingType, $Excel.Worksheets.Item($Excel.Worksheets.Count), $WorksheetCount - $Excel.Worksheets.Count, $Excel.Worksheets.Item(1).Type)
 		$WorksheetNumber = 1
 
 		try {
@@ -4730,13 +4736,16 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Worksheet.Tab.ThemeColor = $ServicesTabColor
 
 			$RowCount = ($SqlServerInventory.Service | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
-			$ColumnCount = 15
+			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
 			$Col = 0
 			$WorksheetData[0,$Col++] = 'Computer Name'
 			$WorksheetData[0,$Col++] = 'Server Name'
 			$WorksheetData[0,$Col++] = 'Service Type'
+			$WorksheetData[0,$Col++] = 'Display Name'
+			$WorksheetData[0,$Col++] = 'Version'
+			$WorksheetData[0,$Col++] = 'Edition'
 			$WorksheetData[0,$Col++] = 'Service IP Address'
 			$WorksheetData[0,$Col++] = 'Service Port'
 			$WorksheetData[0,$Col++] = 'Status'
@@ -4754,7 +4763,10 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.ComputerName
 				$WorksheetData[$Row,$Col++] = $_.ServerName
-				$WorksheetData[$Row,$Col++] = $_.DisplayName #$_.ServiceTypeName
+				$WorksheetData[$Row,$Col++] = $_.ServiceTypeName
+				$WorksheetData[$Row,$Col++] = $_.DisplayName
+				$WorksheetData[$Row,$Col++] = $_.Version
+				$WorksheetData[$Row,$Col++] = $_.Edition
 				$WorksheetData[$Row,$Col++] = $_.ServiceIpAddress
 				$WorksheetData[$Row,$Col++] = $_.Port
 				$WorksheetData[$Row,$Col++] = $_.ServiceState
@@ -4772,7 +4784,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -4786,7 +4798,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -4843,7 +4855,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.IsClustered
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.ProcessorCount
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.MemoryMB
-				$WorksheetData[$Row,$Col++] = "{0:N2}" -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
+				$WorksheetData[$Row,$Col++] = '{0:N2}' -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.OperatingSystem.Name
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.ComputerSystemProduct.Manufacturer
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.ComputerSystemProduct.Name
@@ -4853,7 +4865,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -4870,369 +4882,369 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 15; NumberFormat = $XlNumFmtNumberS2}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
 
 
-			# 			# Worksheet 3: Server Configuration (VERTICAL FORMAT)
-			# 			$ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Server Configuration"
-			# 			Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
-			# 			Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
+			# # Worksheet 3: Server Configuration (VERTICAL FORMAT)
+			# $ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Server Configuration"
+			# Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
+			# Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
 			#region
-			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
-			# 			$Worksheet.Name = 'Server Config'
-			# 			$Worksheet.Tab.ThemeColor = $ServerTabColor
+			# $Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
+			# $Worksheet.Name = 'Server Config'
+			# $Worksheet.Tab.ThemeColor = $ServerTabColor
 			# 
-			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
-			# 			#$ColumnCount = 15
-			# 			$ColumnCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
-			# 			$RowCount = 130
-			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
+			# #$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
+			# #$ColumnCount = 15
+			# $ColumnCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
+			# $RowCount = 130
+			# $WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
-			# 			$Row = 0
-			# 			$WorksheetData[$Row++,0] = 'Server Name'
-			# 			$WorksheetData[$Row++,0] = 'General'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Product'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Edition'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Level'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Version'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Platform'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Operating System'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Language'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Total Memory (MB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Instance Memory In Use (MB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Processors'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Root Directory'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Server Collation'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Is Clustered'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'AlwaysOn AG Enabled'
-			# 			#16
-			# 			$WorksheetData[$Row++,0] = 'Memory'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Server Memory Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Use AWE'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Minimum Server Memory (MB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Maximum Server Memory (MB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Other Memory Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Index Creation Memory (KB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Min Memory Per Query (KB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Set Working Set Size'	# a.k.a. "Reserve physical memory for SQL Server" in SQL 2000
-			# 			# 25
-			# 			$WorksheetData[$Row++,0] = 'Processors'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Enable Processors'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Auto Processor Affinity Mask'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Auto IO Affinity Mask'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Processor Affinity Mask'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Processor Affinity Mask 64'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'IO Affinity Mask'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'IO Affinity Mask 64'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Threads'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Max Worker Threads'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Boost SQL Server Priority'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Use Windows Fibers'
-			# 			# 37
-			# 			$WorksheetData[$Row++,0] = 'Security'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Authentication Mode'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Login Auditing'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Server Proxy Account'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Proxy Account Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Proxy Account'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Common Criteria Compliance Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'C2 Audit Tracing Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Cross Database Ownership Chaining'
-			# 			# 47
-			# 			$WorksheetData[$Row++,0] = 'Connections'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Max Concurrent Connections'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Query Gov. Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Query Gov. Timeout (sec)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Default Connection Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Interim/Deferred Constraint Checking Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Implicit Transactions Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Cursor Close On Commit Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Ansi Warnings Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Ansi Padding Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Arithmatic Abort Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Arithmatic Ignore Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Quoted Identifier Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'No Count Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'ANSI NULL Default On'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'ANSI NULL Default Off'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Concat Null Yields Null Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Numeric Round Abort Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Xact Abort Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Remote Server Connections'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Allow Remote Admin Connections'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Allow Remote Connections'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Remote Query Timeout (sec)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Require Distributed Transactions'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'AdHoc Distributed Queries Enabled'
-			# 			# 72
-			# 			$WorksheetData[$Row++,0] = 'Database Settings'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Default Index Fill Factor'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Backup Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Default Backup Retention (days)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Compress Backups'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Recovery Interval (mins)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Database Default Locations'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Default Data Path'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Default Log Path'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Default Backup Path'
-			# 			# 82
-			# 			$WorksheetData[$Row++,0] = 'Advanced'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Containment'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Enabled Contained DBs'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'FILESTREAM'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'FILESTREAM Access Level'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Full-Text'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Crawl Bandwidth Max'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Crawl Bandwidth Min'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Crawl Range Max'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Notify Bandwidth Max'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Notify Bandwidth Min'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Precompute Rank'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Protocol Handler Timeout'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Transform Noise Words'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Miscellaneous'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Allow Triggers To Fire Others'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Blocked Process Threshold (sec)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'CLR Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Cursor Threshold'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Database Mail XPs Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Default Full-Text Language'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Default Language'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Default Trace Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Disallow Results From Triggers'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Extensible Key Management Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Upgrade Option'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'In Doubt Transaction Resolution'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Max Text Repl Size'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'OLE Automation Procs Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Optimize for Ad hoc Workloads'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Replication XPs Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Scan for Startup Procs'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Server Trigger Recursion Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Show Advanced Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'SMO & DMO XPs Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'SQL Agent XPs Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'SQL Mail XPs Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Two Digit Year Cutoff'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Web Assistant Procs Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'xp_cmdshell Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Network'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Network Packet Size (Bytes)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Remote Login Timeout (sec)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Parallelism'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Cost Threshold for Parallelism'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Locks'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Max Degree of Parallelism'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Query Wait (sec)'
-			# 			# 130
+			# $Row = 0
+			# $WorksheetData[$Row++,0] = 'Server Name'
+			# $WorksheetData[$Row++,0] = 'General'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Product'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Edition'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Level'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Version'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Platform'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Operating System'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Language'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Total Memory (MB)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Instance Memory In Use (MB)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Processors'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Root Directory'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Server Collation'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Is Clustered'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'AlwaysOn AG Enabled'
+			# #16
+			# $WorksheetData[$Row++,0] = 'Memory'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Server Memory Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Use AWE'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Minimum Server Memory (MB)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Maximum Server Memory (MB)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Other Memory Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Index Creation Memory (KB)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Min Memory Per Query (KB)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Set Working Set Size'# a.k.a. "Reserve physical memory for SQL Server" in SQL 2000
+			# # 25
+			# $WorksheetData[$Row++,0] = 'Processors'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Enable Processors'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Auto Processor Affinity Mask'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Auto IO Affinity Mask'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Processor Affinity Mask'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Processor Affinity Mask 64'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'IO Affinity Mask'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'IO Affinity Mask 64'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Threads'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Max Worker Threads'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Boost SQL Server Priority'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Use Windows Fibers'
+			# # 37
+			# $WorksheetData[$Row++,0] = 'Security'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Authentication Mode'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Login Auditing'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Server Proxy Account'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Proxy Account Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Proxy Account'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Common Criteria Compliance Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'C2 Audit Tracing Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Cross Database Ownership Chaining'
+			# # 47
+			# $WorksheetData[$Row++,0] = 'Connections'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Max Concurrent Connections'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Query Gov. Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Query Gov. Timeout (sec)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Default Connection Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Interim/Deferred Constraint Checking Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Implicit Transactions Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Cursor Close On Commit Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Ansi Warnings Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Ansi Padding Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Arithmatic Abort Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Arithmatic Ignore Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Quoted Identifier Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'No Count Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'ANSI NULL Default On'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'ANSI NULL Default Off'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Concat Null Yields Null Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Numeric Round Abort Default'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Xact Abort Default'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Remote Server Connections'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Allow Remote Admin Connections'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Allow Remote Connections'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Remote Query Timeout (sec)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Require Distributed Transactions'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'AdHoc Distributed Queries Enabled'
+			# # 72
+			# $WorksheetData[$Row++,0] = 'Database Settings'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Default Index Fill Factor'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Backup Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Default Backup Retention (days)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Compress Backups'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Recovery Interval (mins)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Database Default Locations'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Default Data Path'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Default Log Path'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Default Backup Path'
+			# # 82
+			# $WorksheetData[$Row++,0] = 'Advanced'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Containment'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Enabled Contained DBs'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'FILESTREAM'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'FILESTREAM Access Level'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Full-Text'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Crawl Bandwidth Max'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Crawl Bandwidth Min'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Crawl Range Max'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Notify Bandwidth Max'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Notify Bandwidth Min'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Precompute Rank'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Protocol Handler Timeout'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Transform Noise Words'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Miscellaneous'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Allow Triggers To Fire Others'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Blocked Process Threshold (sec)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'CLR Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Cursor Threshold'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Database Mail XPs Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Default Full-Text Language'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Default Language'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Default Trace Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Disallow Results From Triggers'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Extensible Key Management Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Upgrade Option'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'In Doubt Transaction Resolution'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Max Text Repl Size'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'OLE Automation Procs Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Optimize for Ad hoc Workloads'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Replication XPs Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Scan for Startup Procs'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Server Trigger Recursion Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Show Advanced Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'SMO & DMO XPs Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'SQL Agent XPs Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'SQL Mail XPs Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Two Digit Year Cutoff'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Web Assistant Procs Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'xp_cmdshell Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Network'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Network Packet Size (Bytes)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Remote Login Timeout (sec)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Parallelism'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Cost Threshold for Parallelism'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Locks'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Max Degree of Parallelism'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Query Wait (sec)'
+			# # 130
 			# 
-			# 			$Col = 1
-			# 			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Sort-Object -Property $_.ServerName | ForEach-Object {
-			# 				$Row = 0
+			# $Col = 1
+			# $SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Sort-Object -Property $_.ServerName | ForEach-Object {
+			# $Row = 0
 			# 
-			# 				# General
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Name
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Product
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Edition
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.ProductLevel
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Version
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Platform
-			# 				$WorksheetData[$Row++,$Col] = $_.Machine.OperatingSystem.Settings.OperatingSystem.Name
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Language
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.MemoryMB
-			# 				$WorksheetData[$Row++,$Col] = "{0:N2}" -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.ProcessorCount
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.RootDirectory
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.ServerCollation
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.IsClustered
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.IsHadrEnabled
+			# # General
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Name
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Product
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Edition
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.ProductLevel
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Version
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Platform
+			# $WorksheetData[$Row++,$Col] = $_.Machine.OperatingSystem.Settings.OperatingSystem.Name
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.Language
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.MemoryMB
+			# $WorksheetData[$Row++,$Col] = "{0:N2}" -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.ProcessorCount
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.RootDirectory
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.ServerCollation
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.IsClustered
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.General.IsHadrEnabled
 			# 
-			# 				# Memory
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.MinServerMemoryMB.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.MaxServerMemoryMB.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.IndexCreationMemoryKB.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.MinMemoryPerQueryKB.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.SetWorkingSetSize.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.UseAweToAllocateMemory.RunningValue
+			# # Memory
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.MinServerMemoryMB.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.MaxServerMemoryMB.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.IndexCreationMemoryKB.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.MinMemoryPerQueryKB.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.SetWorkingSetSize.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Memory.UseAweToAllocateMemory.RunningValue
 			# 
-			# 				# Processors
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AutoSetProcessorAffinityMask.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AutoSetIoAffinityMask.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AffinityMask.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.Affinity64Mask.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AffinityIOMask.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.Affinity64IOMask.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.MaxWorkerThreads.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.BoostSqlServerPriority.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.UseWindowsFibers.RunningValue
+			# # Processors
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AutoSetProcessorAffinityMask.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AutoSetIoAffinityMask.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AffinityMask.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.Affinity64Mask.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.AffinityIOMask.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.Affinity64IOMask.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.MaxWorkerThreads.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.BoostSqlServerPriority.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Processor.UseWindowsFibers.RunningValue
 			# 
-			# 				# Security
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.AuthenticationMode
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.LoginAuditLevel
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.ServerProxyAccount.Enabled
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.ServerProxyAccount.Username
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.EnableCommonCriteriaCompliance.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.EnableC2AuditTracing.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.CrossDatabaseOwnershipChaining.RunningValue
+			# # Security
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.AuthenticationMode
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.LoginAuditLevel
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.ServerProxyAccount.Enabled
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.ServerProxyAccount.Username
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.EnableCommonCriteriaCompliance.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.EnableC2AuditTracing.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Security.CrossDatabaseOwnershipChaining.RunningValue
 			# 
-			# 				# Connections
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.MaxConcurrentConnections.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.QueryGovernor.Enabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.QueryGovernor.TimeoutSeconds.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.InterimConstraintChecking.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ImplicitTransactions.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.CursorCloseOnCommit.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiWarnings.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiPadding.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ArithmeticAbort.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ArithmeticIgnore.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.QuotedIdentifier.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.NoCount.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiNullDefaultOn.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiNullDefaultOff.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ConcatNullYieldsNull.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.NumericRoundAbort.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.XactAbort.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.RemoteAdminConnectionsEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.AllowRemoteConnections.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.RemoteQueryTimeoutSeconds.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.RequireDistributedTransactions.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.AdHocDistributedQueriesEnabled.RunningValue
+			# # Connections
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.MaxConcurrentConnections.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.QueryGovernor.Enabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.QueryGovernor.TimeoutSeconds.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.InterimConstraintChecking.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ImplicitTransactions.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.CursorCloseOnCommit.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiWarnings.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiPadding.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ArithmeticAbort.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ArithmeticIgnore.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.QuotedIdentifier.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.NoCount.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiNullDefaultOn.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.AnsiNullDefaultOff.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.ConcatNullYieldsNull.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.NumericRoundAbort.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.DefaultOptions.XactAbort.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.RemoteAdminConnectionsEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.AllowRemoteConnections.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.RemoteQueryTimeoutSeconds.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.RequireDistributedTransactions.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Connections.AdHocDistributedQueriesEnabled.RunningValue
 			# 
-			# 				# Database Settings
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.IndexFillFactor.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.BackupMediaRetentionDays.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.CompressBackup.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.RecoveryIntervalMinutes.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.DataPath
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.LogPath
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.BackupPath
+			# # Database Settings
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.IndexFillFactor.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.BackupMediaRetentionDays.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.CompressBackup.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.RecoveryIntervalMinutes.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.DataPath
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.LogPath
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.DatabaseSettings.BackupPath
 			# 
-			# 				# Advanced
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Containment.EnableContainedDatabases.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Filestream.FilestreamAccessLevel.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextCrawlBandwidthMax.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextCrawlBandwidthMin.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextCrawlRangeMax.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextNotifyBandwidthMax.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextNotifyBandwidthMin.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.PrecomputeRank.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.ProtocolHandlerTimeout.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.TransformNoiseWords.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.AllowTriggersToFireOthers.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.BlockedProcessThresholdSeconds.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ClrEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.CursorThreshold.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DatabaseMailXPsEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DefaultFullTextLanguage.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DefaultLanguage.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DefaultTraceEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DisallowResultsFromTriggers.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ExtensibleKeyManagementEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.FullTextUpgradeOption.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.InDoubtTransactionResolution.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.MaxTextReplicationSize.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.OleAutomationProceduresEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.OptimizeForAdHocWorkloads.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ReplicationXPsEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ScanForStartupProcs.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ServerTriggerRecursionEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ShowAdvancedOptions.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.SmoAndDmoXPsEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.SqlAgentXPsEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.SqlMailXPsEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.TwoDigitYearCutoff.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.WebAssistantProceduresEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.XPCmdShellEnabled.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Network.NetworkPacketSize.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Network.RemoteLoginTimeoutSeconds.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.CostThresholdForParallelism.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.Locks.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.MaxDegreeOfParallelism.RunningValue
-			# 				$WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.QueryWaitSeconds.RunningValue
+			# # Advanced
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Containment.EnableContainedDatabases.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Filestream.FilestreamAccessLevel.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextCrawlBandwidthMax.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextCrawlBandwidthMin.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextCrawlRangeMax.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextNotifyBandwidthMax.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.FullTextNotifyBandwidthMin.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.PrecomputeRank.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.ProtocolHandlerTimeout.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.FullText.TransformNoiseWords.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.AllowTriggersToFireOthers.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.BlockedProcessThresholdSeconds.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ClrEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.CursorThreshold.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DatabaseMailXPsEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DefaultFullTextLanguage.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DefaultLanguage.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DefaultTraceEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.DisallowResultsFromTriggers.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ExtensibleKeyManagementEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.FullTextUpgradeOption.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.InDoubtTransactionResolution.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.MaxTextReplicationSize.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.OleAutomationProceduresEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.OptimizeForAdHocWorkloads.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ReplicationXPsEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ScanForStartupProcs.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ServerTriggerRecursionEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.ShowAdvancedOptions.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.SmoAndDmoXPsEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.SqlAgentXPsEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.SqlMailXPsEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.TwoDigitYearCutoff.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.WebAssistantProceduresEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Miscellaneous.XPCmdShellEnabled.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Network.NetworkPacketSize.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Network.RemoteLoginTimeoutSeconds.RunningValue
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.CostThresholdForParallelism.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.Locks.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.MaxDegreeOfParallelism.RunningValue
+			# $WorksheetData[$Row++,$Col] = $_.Server.Configuration.Advanced.Parallelism.QueryWaitSeconds.RunningValue
 			# 
-			# 				$Col++
-			# 			}
-			# 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
-			# 			$Range.Value2 = $WorksheetData
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			# $Col++
+			# }
+			# $Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
+			# $Range.Value2 = $WorksheetData
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 			# 
-			# 			$WorksheetFormat.Add($WorksheetNumber, @{
-			# 					BoldFirstRow = $false
-			# 					BoldFirstColumn = $true
-			# 					AutoFilter = $false
-			# 					FreezeAtCell = 'B2'
-			# 					ColumnFormat = @()
-			# 					RowFormat = @(
-			# 						@{RowNumber = 10; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 11; NumberFormat = $XlNumFmtNumberS2},
-			# 						@{RowNumber = 12; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 20; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 21; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 23; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 24; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 30; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 31; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 32; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 33; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 35; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 49; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 51; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 70; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 75; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 76; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 78; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 89; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 90; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 91; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 92; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 93; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 95; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 99; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 101; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 102; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 103; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 110; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 120; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 124; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 125; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 127; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 128; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 129; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 130; NumberFormat = $XlNumFmtNumberGeneral}
-			# 					)
-			# 				})
+			# $WorksheetFormat.Add($WorksheetNumber, @{
+			# BoldFirstRow = $false
+			# BoldFirstColumn = $true
+			# AutoFilter = $false
+			# FreezeAtCell = 'B2'
+			# ColumnFormat = @()
+			# RowFormat = @(
+			# @{RowNumber = 10; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 11; NumberFormat = $XlNumFmtNumberS2},
+			# @{RowNumber = 12; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 20; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 21; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 23; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 24; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 30; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 31; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 32; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 33; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 35; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 49; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 51; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 70; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 75; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 76; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 78; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 89; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 90; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 91; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 92; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 93; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 95; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 99; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 101; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 102; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 103; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 110; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 120; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 124; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 125; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 127; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 128; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 129; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 130; NumberFormat = $XlNumFmtNumberGeneral}
+			# )
+			# })
 			# 
-			# 			$WorksheetNumber++
+			# $WorksheetNumber++
 			#endregion
 
 
@@ -5278,7 +5290,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.OperatingSystem.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Language
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.MemoryMB
-				$WorksheetData[$Row,$Col++] = "{0:N2}" -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
+				$WorksheetData[$Row,$Col++] = '{0:N2}' -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.ProcessorCount
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.RootDirectory
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.ServerCollation
@@ -5288,7 +5300,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5303,7 +5315,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 11; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5345,7 +5357,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5361,7 +5373,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5409,7 +5421,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5426,7 +5438,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 9; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5470,7 +5482,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5481,7 +5493,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'B2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5555,7 +5567,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5570,7 +5582,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 22; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5614,7 +5626,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5629,7 +5641,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 5; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5742,7 +5754,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5772,7 +5784,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 42; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5821,7 +5833,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5832,7 +5844,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'B2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5885,7 +5897,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -5896,7 +5908,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'B2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -5981,7 +5993,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6061,7 +6073,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -6073,7 +6085,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 3; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6139,7 +6151,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -6152,7 +6164,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 4; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6201,7 +6213,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -6214,7 +6226,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6281,7 +6293,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -6298,7 +6310,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 16; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6357,7 +6369,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -6367,7 +6379,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					ColumnFormat = @(
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6418,7 +6430,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -6430,113 +6442,113 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 3; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
 
 
-			# 			# Worksheet 19: Server Objects - Linked Server Configuration (VERTICAL FORMAT)
-			# 			$ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Server Objects - Linked Server Configuration"
-			# 			Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
-			# 			Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
+			# # Worksheet 19: Server Objects - Linked Server Configuration (VERTICAL FORMAT)
+			# $ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Server Objects - Linked Server Configuration"
+			# Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
+			# Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
 			#region
-			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
-			# 			$Worksheet.Name = 'SVR Objects - Linked Server Cfg'
-			# 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
+			# $Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
+			# $Worksheet.Name = 'SVR Objects - Linked Server Cfg'
+			# $Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 			# 
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.LinkedServers }) | Measure-Object).Count + 1
+			# $ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.LinkedServers }) | Measure-Object).Count + 1
 			# 
-			# 			$RowCount = 24
-			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
+			# $RowCount = 24
+			# $WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
-			# 			$Row = 0
-			# 			$WorksheetData[$Row++,0] = 'Server Name'
-			# 			$WorksheetData[$Row++,0] = 'General'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Linked Server'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Product Name'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Provider Name'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Data Source'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Provider String'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Location'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Catalog'
-			# 			#9
-			# 			$WorksheetData[$Row++,0] = 'Server Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Collation Compatible'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Data Access'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'RPC'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'RPC Out'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Use Remote Collation'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Collation Name'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Connection Timeout (sec)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Query Timeout (sec)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Distributor'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Distribution Publisher'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Publisher'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Subscriber'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Lazy Schema Validation'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Enable Promotion of Distributed Transactions'
-			# 			#24
+			# $Row = 0
+			# $WorksheetData[$Row++,0] = 'Server Name'
+			# $WorksheetData[$Row++,0] = 'General'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Linked Server'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Product Name'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Provider Name'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Data Source'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Provider String'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Location'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Catalog'
+			# #9
+			# $WorksheetData[$Row++,0] = 'Server Options'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Collation Compatible'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Data Access'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'RPC'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'RPC Out'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Use Remote Collation'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Collation Name'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Connection Timeout (sec)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Query Timeout (sec)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Distributor'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Distribution Publisher'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Publisher'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Subscriber'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Lazy Schema Validation'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Enable Promotion of Distributed Transactions'
+			# #24
 			# 
-			# 			$Col = 1
-			# 			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
-			# 				$ServerName = $_.Server.Configuration.General.Name
+			# $Col = 1
+			# $SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
+			# $ServerName = $_.Server.Configuration.General.Name
 			# 
-			# 				$_.Server.ServerObjects.LinkedServers | Sort-Object -Property $_.Name | ForEach-Object {
+			# $_.Server.ServerObjects.LinkedServers | Sort-Object -Property $_.Name | ForEach-Object {
 			# 
-			# 					$Row = 0
+			# $Row = 0
 			# 
-			# 					# General
-			# 					$WorksheetData[$Row++,$Col] = $ServerName
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.General.Name
-			# 					$WorksheetData[$Row++,$Col] = $_.General.ProductName
-			# 					$WorksheetData[$Row++,$Col] = $_.General.ProviderName
-			# 					$WorksheetData[$Row++,$Col] = $_.General.DataSource
-			# 					$WorksheetData[$Row++,$Col] = $_.General.ProviderString
-			# 					$WorksheetData[$Row++,$Col] = $_.General.Location
-			# 					$WorksheetData[$Row++,$Col] = $_.General.Catalog
+			# # General
+			# $WorksheetData[$Row++,$Col] = $ServerName
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.General.Name
+			# $WorksheetData[$Row++,$Col] = $_.General.ProductName
+			# $WorksheetData[$Row++,$Col] = $_.General.ProviderName
+			# $WorksheetData[$Row++,$Col] = $_.General.DataSource
+			# $WorksheetData[$Row++,$Col] = $_.General.ProviderString
+			# $WorksheetData[$Row++,$Col] = $_.General.Location
+			# $WorksheetData[$Row++,$Col] = $_.General.Catalog
 			# 
-			# 					# Server Options
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.CollationCompatible
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.DataAccess
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.Rpc
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.RpcOut
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.UseRemoteCollation
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.CollationName
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.ConnectTimeoutSeconds
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.QueryTimeoutSeconds
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.Distributor
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.DistPublisher
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.Publisher
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.Subscriber
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.LazySchemaValidation
-			# 					$WorksheetData[$Row++,$Col] = $_.Options.IsPromotionofDistributedTransactionsForRPCEnabled
+			# # Server Options
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Options.CollationCompatible
+			# $WorksheetData[$Row++,$Col] = $_.Options.DataAccess
+			# $WorksheetData[$Row++,$Col] = $_.Options.Rpc
+			# $WorksheetData[$Row++,$Col] = $_.Options.RpcOut
+			# $WorksheetData[$Row++,$Col] = $_.Options.UseRemoteCollation
+			# $WorksheetData[$Row++,$Col] = $_.Options.CollationName
+			# $WorksheetData[$Row++,$Col] = $_.Options.ConnectTimeoutSeconds
+			# $WorksheetData[$Row++,$Col] = $_.Options.QueryTimeoutSeconds
+			# $WorksheetData[$Row++,$Col] = $_.Options.Distributor
+			# $WorksheetData[$Row++,$Col] = $_.Options.DistPublisher
+			# $WorksheetData[$Row++,$Col] = $_.Options.Publisher
+			# $WorksheetData[$Row++,$Col] = $_.Options.Subscriber
+			# $WorksheetData[$Row++,$Col] = $_.Options.LazySchemaValidation
+			# $WorksheetData[$Row++,$Col] = $_.Options.IsPromotionofDistributedTransactionsForRPCEnabled
 			# 
-			# 					$Col++
-			# 				}
-			# 			}
+			# $Col++
+			# }
+			# }
 			# 
-			# 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
-			# 			$Range.Value2 = $WorksheetData
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			# $Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
+			# $Range.Value2 = $WorksheetData
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 			# 
-			# 			$WorksheetFormat.Add($WorksheetNumber, @{
-			# 					BoldFirstRow = $false
-			# 					BoldFirstColumn = $true
-			# 					AutoFilter = $false
-			# 					FreezeAtCell = 'B2'
-			# 					ColumnFormat = @()
-			# 					RowFormat = @(
-			# 						@{RowNumber = 17; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 18; NumberFormat = $XlNumFmtNumberS0}
-			# 					)
-			# 				})
+			# $WorksheetFormat.Add($WorksheetNumber, @{
+			# BoldFirstRow = $false
+			# BoldFirstColumn = $true
+			# AutoFilter = $false
+			# FreezeAtCell = 'B2'
+			# ColumnFormat = @()
+			# RowFormat = @(
+			# @{RowNumber = 17; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 18; NumberFormat = $XlNumFmtNumberS0}
+			# )
+			# })
 			# 
-			# 			$WorksheetNumber++
+			# $WorksheetNumber++
 			#endregion
 
 
@@ -6623,7 +6635,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -6637,7 +6649,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 18; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6692,7 +6704,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -6703,7 +6715,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6744,7 +6756,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -6754,7 +6766,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'B2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6822,7 +6834,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -6834,7 +6846,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 16; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -6948,7 +6960,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(5), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(11), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(5), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(11), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -6967,7 +6979,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtNumberS0} 
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7038,7 +7050,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -7059,7 +7071,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 18; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7123,7 +7135,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 2; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7176,7 +7188,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(4), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(4), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -7187,7 +7199,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 2; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7232,7 +7244,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -7242,7 +7254,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'C2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7298,7 +7310,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -7310,7 +7322,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7352,7 +7364,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -7362,7 +7374,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'C2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7407,7 +7419,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -7416,7 +7428,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'C2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7470,7 +7482,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -7484,7 +7496,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -7540,9 +7552,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					$WorksheetData[$Row,$Col++] = $_.Properties.Options.RecoveryModel
 					$WorksheetData[$Row,$Col++] = ($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object).Count
 					$WorksheetData[$Row,$Col++] = ($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'Log' } | Measure-Object).Count
-					$WorksheetData[$Row,$Col++] = "{0:N2}" -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
-					$WorksheetData[$Row,$Col++] = "{0:N2}" -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'log' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
-					$WorksheetData[$Row,$Col++] = "{0:N2}" -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property AvailableSpaceKB -Sum).Sum / 1KB)
+					$WorksheetData[$Row,$Col++] = '{0:N2}' -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
+					$WorksheetData[$Row,$Col++] = '{0:N2}' -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'log' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
+					$WorksheetData[$Row,$Col++] = '{0:N2}' -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property AvailableSpaceKB -Sum).Sum / 1KB)
 					$WorksheetData[$Row,$Col++] = $_.Properties.General.Database.LastKnownGoodDbccDate
 					$WorksheetData[$Row,$Col++] = $_.Properties.General.Backup.LastFullBackupDate
 					$WorksheetData[$Row,$Col++] = $_.Properties.General.Backup.LastDifferentialBackupDate
@@ -7555,7 +7567,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -7575,328 +7587,328 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
 
 
-			# 			# Worksheet 33: Database Configuration (VERTICAL FORMAT)
-			# 			$ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Database Configuration"
-			# 			Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
-			# 			Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
+			# # Worksheet 33: Database Configuration (VERTICAL FORMAT)
+			# $ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Database Configuration"
+			# Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
+			# Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
 			#region
-			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
-			# 			$Worksheet.Name = 'DB Config'
-			# 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
+			# $Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
+			# $Worksheet.Name = 'DB Config'
+			# $Worksheet.Tab.ThemeColor = $DatabaseTabColor
 			# 
-			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
-			# 			#$ColumnCount = 15
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
-			# 			$RowCount = 101
-			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
+			# #$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
+			# #$ColumnCount = 15
+			# $ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
+			# $RowCount = 101
+			# $WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
-			# 			$Row = 0
-			# 			$WorksheetData[$Row++,0] = 'Server Name'
-			# 			$WorksheetData[$Row++,0] = 'Database Name'
-			# 			# 2
-			# 			$WorksheetData[$Row++,0] = 'General'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Backup'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Last Full Backup Date'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Last Differential Backup Date'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Last Log Backup Date'
-			# 			# 7
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Database'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Database Snapshot Base Name'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Date Created'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Last Known Good DBCC Date'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is AlwaysOn AG Member'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is Database Snapshot'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is Database Snapshot Base'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is Mail Host'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is Management Data Warehouse'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Mirroring Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is System Object'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Number Of Users'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Owner'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Size (MB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Space Available (KB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Status'
-			# 			# 24
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Maintenance'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Collation'
-			# 			# 26
-			# 			$WorksheetData[$Row++,0] = 'Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Collation'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Recovery Model'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Compatibility Level'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Containment Type'
-			# 			# 31
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Other Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Automatic' 
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Close'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Create Statistics'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Shrink'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Update Statistics'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Auto UpdateStatistics Async'
-			# 			# 38
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Containment'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Default Full-Text Language'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Default Language'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Nested Triggers Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Transform Noise Words'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Two Digit Year Cutoff'
-			# 			# 44
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Cursor'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Close Cursor on Commit Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Local Cursor Default'
-			# 			# 47
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'FILESTREAM'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'FILESTREAM DirectoryName'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'FILESTREAM Non-Transacted Access'
-			# 			# 50
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Miscellaneous'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Allow Snapshot Isolation'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI NULL Default'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI NULLS Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI Padding Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI Warnings Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Arithmetic Abort Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Concatenate Null Yields Null'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Cross-Database Ownership Chaining Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Date Correlation Optimization Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Is Read Committed Snapshot On'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Numeric Round-Abort Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Parameterization'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Quoted Identifiers Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Recursive Triggers Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Trustworthy'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'VarDecimal Storage Format Enabled'
-			# 			# 67
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Recovery'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Page Verify'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Target Recovery Time (sec)'
-			# 			# 70
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Service Broker'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Broker Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Honor Broker Priority'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Service Broker Identifier'
-			# 			# 74
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'State'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Database Read-Only'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Encryption Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString___3 + 'Restrict Access'
-			# 			# 78
-			# 			$WorksheetData[$Row++,0] = 'AlwaysOn'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Availability Database Synchronization State'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Availability Group Name'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'IsAvailability Group Member'
-			# 			# 82
-			# 			$WorksheetData[$Row++,0] = 'Change Tracking'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Retention Period'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Retention Period Units'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Auto Cleanup'
-			# 			# 87
-			# 			$WorksheetData[$Row++,0] = 'Mirroring'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Failover Log Sequence Number'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring ID'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Partner'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Partner Instance'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Redo Queue Max Size (KB)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Role Sequence'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Safety Level'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Safety Sequence'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Status'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Timeout (sec)'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Witness'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Witness Status'
-			# 			# 101
-			# 
-			# 
-			# 			$Col = 1
-			# 			$SqlServerInventory.DatabaseServer | Sort-Object -Property $_.ServerName | ForEach-Object {
-			# 
-			# 				$ServerName = $_.Server.Configuration.General.Name
-			# 
-			# 				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
-			# 
-			# 					$Row = 0
-			# 
-			# 					$WorksheetData[$Row++,$Col] = $ServerName
-			# 					$WorksheetData[$Row++,$Col] = $_.Name
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 
-			# 					# General - Backup
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Backup.LastFullBackupDate
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Backup.LastDifferentialBackupDate
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Backup.LastLogBackupDate
-			# 
-			# 					# General - Database
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.DatabaseSnapshotBaseName
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.DateCreated
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.LastKnownGoodDbccDate
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsAvailabilityGroupMember
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsDatabaseSnapshot
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsDatabaseSnapshotBase
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsFullTextEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsMailHost
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsManagementDataWarehouse
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsMirroringEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsSystemObject
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.NumberOfUsers
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.Owner
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.SizeMB
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.SpaceAvailableKB
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Database.Status
-			# 
-			# 					# General - Maintenance
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.General.Maintenance.Collation
-			# 
-			# 					# Options
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.Collation
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.RecoveryModel
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.CompatibilityLevel
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.ContainmentType
-			# 
-			# 					# Options - Other Options
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 
-			# 					# Options - Other Options - Automatic
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoClose
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoCreateStatistics
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoShrink
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoUpdateStatistics
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoUpdateStatisticsAsync
-			# 
-			# 					# Options - Other Options - Containment
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.DefaultFullTextLanguage
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.DefaultLanguage
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.NestedTriggersEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.TransformNoiseWords
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.TwoDigitYearCutoff
+			# $Row = 0
+			# $WorksheetData[$Row++,0] = 'Server Name'
+			# $WorksheetData[$Row++,0] = 'Database Name'
+			# # 2
+			# $WorksheetData[$Row++,0] = 'General'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Backup'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Last Full Backup Date'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Last Differential Backup Date'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Last Log Backup Date'
+			# # 7
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Database'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Database Snapshot Base Name'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Date Created'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Last Known Good DBCC Date'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is AlwaysOn AG Member'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is Database Snapshot'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is Database Snapshot Base'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Full-Text Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is Mail Host'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is Management Data Warehouse'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Mirroring Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is System Object'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Number Of Users'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Owner'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Size (MB)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Space Available (KB)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Status'
+			# # 24
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Maintenance'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Collation'
+			# # 26
+			# $WorksheetData[$Row++,0] = 'Options'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Collation'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Recovery Model'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Compatibility Level'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Containment Type'
+			# # 31
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Other Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Automatic' 
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Close'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Create Statistics'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Shrink'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Auto Update Statistics'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Auto UpdateStatistics Async'
+			# # 38
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Containment'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Default Full-Text Language'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Default Language'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Nested Triggers Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Transform Noise Words'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Two Digit Year Cutoff'
+			# # 44
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Cursor'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Close Cursor on Commit Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Local Cursor Default'
+			# # 47
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'FILESTREAM'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'FILESTREAM DirectoryName'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'FILESTREAM Non-Transacted Access'
+			# # 50
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Miscellaneous'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Allow Snapshot Isolation'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI NULL Default'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI NULLS Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI Padding Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'ANSI Warnings Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Arithmetic Abort Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Concatenate Null Yields Null'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Cross-Database Ownership Chaining Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Date Correlation Optimization Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Is Read Committed Snapshot On'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Numeric Round-Abort Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Parameterization'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Quoted Identifiers Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Recursive Triggers Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Trustworthy'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'VarDecimal Storage Format Enabled'
+			# # 67
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Recovery'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Page Verify'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Target Recovery Time (sec)'
+			# # 70
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Service Broker'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Broker Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Honor Broker Priority'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Service Broker Identifier'
+			# # 74
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'State'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Database Read-Only'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Encryption Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString___3 + 'Restrict Access'
+			# # 78
+			# $WorksheetData[$Row++,0] = 'AlwaysOn'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Availability Database Synchronization State'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Availability Group Name'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'IsAvailability Group Member'
+			# # 82
+			# $WorksheetData[$Row++,0] = 'Change Tracking'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Retention Period'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Retention Period Units'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Auto Cleanup'
+			# # 87
+			# $WorksheetData[$Row++,0] = 'Mirroring'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Failover Log Sequence Number'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring ID'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Partner'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Partner Instance'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Redo Queue Max Size (KB)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Role Sequence'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Safety Level'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Safety Sequence'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Status'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Timeout (sec)'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Witness'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Mirroring Witness Status'
+			# # 101
 			# 
 			# 
-			# 					# Options - Other Options - Cursor
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Cursor.CloseCursorsOnCommitEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Cursor.LocalCursorsDefault
+			# $Col = 1
+			# $SqlServerInventory.DatabaseServer | Sort-Object -Property $_.ServerName | ForEach-Object {
 			# 
-			# 					# Options - Other Options - FILESTREAM
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Filestream.FilestreamDirectoryName
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Filestream.FilestreamNonTransactedAccess
+			# $ServerName = $_.Server.Configuration.General.Name
 			# 
-			# 					# Options - Other Options - Miscellaneous
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.SnapshotIsolation
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiNullDefault
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiNullsEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiPaddingEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiWarningsEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.ArithmeticAbortEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.ConcatenateNullYieldsNull
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.DatabaseOwnershipChaining
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.DateCorrelationOptimization
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.IsReadCommittedSnapshotOn
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.NumericRoundAbortEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.Parameterization
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.QuotedIdentifiersEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.RecursiveTriggersEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.Trustworthy
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.VarDecimalStorageFormatEnabled
+			# $_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 			# 
-			# 					# Options - Other Options - Recovery
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Recovery.PageVerify
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Recovery.TargetRecoveryTimeSeconds
+			# $Row = 0
 			# 
-			# 					# Options - Other Options - ServiceBroker
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.ServiceBroker.BrokerEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.ServiceBroker.HonorBrokerPriority
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.ServiceBroker.ServiceBrokerIdentifier
+			# $WorksheetData[$Row++,$Col] = $ServerName
+			# $WorksheetData[$Row++,$Col] = $_.Name
+			# $WorksheetData[$Row++,$Col] = $null
 			# 
-			# 					# Options - Other Options - State
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.State.DatabaseReadOnly
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.State.EncryptionEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.State.RestrictAccess
+			# # General - Backup
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Backup.LastFullBackupDate
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Backup.LastDifferentialBackupDate
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Backup.LastLogBackupDate
 			# 
-			# 					# AlwaysOn
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.AlwaysOn.AvailabilityDatabaseSynchronizationState
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.AlwaysOn.AvailabilityGroupName
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.AlwaysOn.IsAvailabilityGroupMember
+			# # General - Database
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.DatabaseSnapshotBaseName
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.DateCreated
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.LastKnownGoodDbccDate
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsAvailabilityGroupMember
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsDatabaseSnapshot
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsDatabaseSnapshotBase
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsFullTextEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsMailHost
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsManagementDataWarehouse
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsMirroringEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.IsSystemObject
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.NumberOfUsers
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.Owner
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.SizeMB
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.SpaceAvailableKB
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Database.Status
 			# 
-			# 					# Change Tracking
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.IsEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.RetentionPeriod
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.RetentionPeriodUnits 
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.AutoCleanUp
+			# # General - Maintenance
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.General.Maintenance.Collation
 			# 
-			# 					# Mirroring
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.IsEnabled
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringFailoverLogSequenceNumber
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringID
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringPartner
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringPartnerInstance
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringRedoQueueMaxSizeKB
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringRoleSequence
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringSafetyLevel
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringSafetySequence
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringStatus
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringTimeoutSeconds
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringWitness
-			# 					$WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringWitnessStatus
+			# # Options
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.Collation
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.RecoveryModel
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.CompatibilityLevel
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.ContainmentType
 			# 
-			# 					$Col++
+			# # Options - Other Options
+			# $WorksheetData[$Row++,$Col] = $null
 			# 
-			# 				}
-			# 			}
-			# 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
-			# 			$Range.Value2 = $WorksheetData
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			# # Options - Other Options - Automatic
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoClose
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoCreateStatistics
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoShrink
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoUpdateStatistics
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Automatic.AutoUpdateStatisticsAsync
 			# 
-			# 			$WorksheetFormat.Add($WorksheetNumber, @{
-			# 					BoldFirstRow = $false
-			# 					BoldFirstColumn = $true
-			# 					AutoFilter = $false
-			# 					FreezeAtCell = 'B2'
-			# 					ColumnFormat = @()
-			# 					RowFormat = @(
-			# 						@{RowNumber = 5; NumberFormat = $XlNumFmtDate},
-			# 						@{RowNumber = 6; NumberFormat = $XlNumFmtDate},
-			# 						@{RowNumber = 7; NumberFormat = $XlNumFmtDate},
-			# 						@{RowNumber = 10; NumberFormat = $XlNumFmtDate},
-			# 						@{RowNumber = 11; NumberFormat = $XlNumFmtDate},
-			# 						@{RowNumber = 20; NumberFormat = $XlNumFmtNumberS2},
-			# 						@{RowNumber = 22; NumberFormat = $XlNumFmtNumberS2},
-			# 						@{RowNumber = 23; NumberFormat = $XlNumFmtNumberS2},
-			# 						@{RowNumber = 44; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 70; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 85; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 90; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 94; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 95; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 97; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 99; NumberFormat = $XlNumFmtNumberS0}
-			# 					)
-			# 				})
+			# # Options - Other Options - Containment
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.DefaultFullTextLanguage
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.DefaultLanguage
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.NestedTriggersEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.TransformNoiseWords
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Containment.TwoDigitYearCutoff
 			# 
-			# 			$WorksheetNumber++
+			# 
+			# # Options - Other Options - Cursor
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Cursor.CloseCursorsOnCommitEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Cursor.LocalCursorsDefault
+			# 
+			# # Options - Other Options - FILESTREAM
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Filestream.FilestreamDirectoryName
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Filestream.FilestreamNonTransactedAccess
+			# 
+			# # Options - Other Options - Miscellaneous
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.SnapshotIsolation
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiNullDefault
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiNullsEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiPaddingEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.AnsiWarningsEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.ArithmeticAbortEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.ConcatenateNullYieldsNull
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.DatabaseOwnershipChaining
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.DateCorrelationOptimization
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.IsReadCommittedSnapshotOn
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.NumericRoundAbortEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.Parameterization
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.QuotedIdentifiersEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.RecursiveTriggersEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.Trustworthy
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Miscellaneous.VarDecimalStorageFormatEnabled
+			# 
+			# # Options - Other Options - Recovery
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Recovery.PageVerify
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.Recovery.TargetRecoveryTimeSeconds
+			# 
+			# # Options - Other Options - ServiceBroker
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.ServiceBroker.BrokerEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.ServiceBroker.HonorBrokerPriority
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.ServiceBroker.ServiceBrokerIdentifier
+			# 
+			# # Options - Other Options - State
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.State.DatabaseReadOnly
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.State.EncryptionEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Options.OtherOptions.State.RestrictAccess
+			# 
+			# # AlwaysOn
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.AlwaysOn.AvailabilityDatabaseSynchronizationState
+			# $WorksheetData[$Row++,$Col] = $_.Properties.AlwaysOn.AvailabilityGroupName
+			# $WorksheetData[$Row++,$Col] = $_.Properties.AlwaysOn.IsAvailabilityGroupMember
+			# 
+			# # Change Tracking
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.IsEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.RetentionPeriod
+			# $WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.RetentionPeriodUnits 
+			# $WorksheetData[$Row++,$Col] = $_.Properties.ChangeTracking.AutoCleanUp
+			# 
+			# # Mirroring
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.IsEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringFailoverLogSequenceNumber
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringID
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringPartner
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringPartnerInstance
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringRedoQueueMaxSizeKB
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringRoleSequence
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringSafetyLevel
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringSafetySequence
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringStatus
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringTimeoutSeconds
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringWitness
+			# $WorksheetData[$Row++,$Col] = $_.Properties.Mirroring.MirroringWitnessStatus
+			# 
+			# $Col++
+			# 
+			# }
+			# }
+			# $Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
+			# $Range.Value2 = $WorksheetData
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			# 
+			# $WorksheetFormat.Add($WorksheetNumber, @{
+			# BoldFirstRow = $false
+			# BoldFirstColumn = $true
+			# AutoFilter = $false
+			# FreezeAtCell = 'B2'
+			# ColumnFormat = @()
+			# RowFormat = @(
+			# @{RowNumber = 5; NumberFormat = $XlNumFmtDate},
+			# @{RowNumber = 6; NumberFormat = $XlNumFmtDate},
+			# @{RowNumber = 7; NumberFormat = $XlNumFmtDate},
+			# @{RowNumber = 10; NumberFormat = $XlNumFmtDate},
+			# @{RowNumber = 11; NumberFormat = $XlNumFmtDate},
+			# @{RowNumber = 20; NumberFormat = $XlNumFmtNumberS2},
+			# @{RowNumber = 22; NumberFormat = $XlNumFmtNumberS2},
+			# @{RowNumber = 23; NumberFormat = $XlNumFmtNumberS2},
+			# @{RowNumber = 44; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 70; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 85; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 90; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 94; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 95; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 97; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 99; NumberFormat = $XlNumFmtNumberS0}
+			# )
+			# })
+			# 
+			# $WorksheetNumber++
 			#endregion
 
 
@@ -7990,7 +8002,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -8008,7 +8020,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 21; NumberFormat = $XlNumFmtNumberS2}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -8067,10 +8079,10 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$WorksheetData[$Row,$Col++] = $_.LogicalName
 						$WorksheetData[$Row,$Col++] = $_.FileType
 						$WorksheetData[$Row,$Col++] = $_.Filegroup
-						$WorksheetData[$Row,$Col++] = "{0:N2}" -f ($_.SizeKB / 1KB)
-						$WorksheetData[$Row,$Col++] = "{0:N2}" -f ($_.MaxSizeKB / 1KB)
-						$WorksheetData[$Row,$Col++] = "{0:N2}" -f ($_.UsedSpaceKB / 1KB)
-						$WorksheetData[$Row,$Col++] = if ($_.AvailableSpaceKB) { "{0:N2}" -f ($_.AvailableSpaceKB / 1KB) } else { $null }
+						$WorksheetData[$Row,$Col++] = '{0:N2}' -f ($_.SizeKB / 1KB)
+						$WorksheetData[$Row,$Col++] = '{0:N2}' -f ($_.MaxSizeKB / 1KB)
+						$WorksheetData[$Row,$Col++] = '{0:N2}' -f ($_.UsedSpaceKB / 1KB)
+						$WorksheetData[$Row,$Col++] = if ($_.AvailableSpaceKB) { '{0:N2}' -f ($_.AvailableSpaceKB / 1KB) } else { $null }
 						$WorksheetData[$Row,$Col++] = $_.IsPrimaryFile
 						$WorksheetData[$Row,$Col++] = $_.IsOffline
 						$WorksheetData[$Row,$Col++] = $_.IsReadOnly
@@ -8078,7 +8090,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$WorksheetData[$Row,$Col++] = $_.IsSparse
 						$WorksheetData[$Row,$Col++] = $_.Growth
 						$WorksheetData[$Row,$Col++] = $_.GrowthType
-						$WorksheetData[$Row,$Col++] = "{0:N2}" -f ($_.VolumeFreeSpaceBytes / 1MB)
+						$WorksheetData[$Row,$Col++] = '{0:N2}' -f ($_.VolumeFreeSpaceBytes / 1MB)
 						$WorksheetData[$Row,$Col++] = $_.VlfCount
 						$WorksheetData[$Row,$Col++] = $_.Path
 						$WorksheetData[$Row,$Col++] = $_.FileName
@@ -8088,7 +8100,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -8105,7 +8117,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 18; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -8155,23 +8167,23 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$Row++ 
 					}
 
-					# 					$_.Properties.FileGroups.Filestream | ForEach-Object {
-					# 						$Col = 0
-					# 						$WorksheetData[$Row,$Col++] = $ServerName
-					# 						$WorksheetData[$Row,$Col++] = $DatabaseName
-					# 						$WorksheetData[$Row,$Col++] = 'FILESTREAM'
-					# 						$WorksheetData[$Row,$Col++] = $_.Name
-					# 						$WorksheetData[$Row,$Col++] = $_.Files
-					# 						$WorksheetData[$Row,$Col++] = $_.ReadOnly
-					# 						$WorksheetData[$Row,$Col++] = $_.IsDefault 
-					# 						$Row++ 
-					# 					}
+					# $_.Properties.FileGroups.Filestream | ForEach-Object {
+					# $Col = 0
+					# $WorksheetData[$Row,$Col++] = $ServerName
+					# $WorksheetData[$Row,$Col++] = $DatabaseName
+					# $WorksheetData[$Row,$Col++] = 'FILESTREAM'
+					# $WorksheetData[$Row,$Col++] = $_.Name
+					# $WorksheetData[$Row,$Col++] = $_.Files
+					# $WorksheetData[$Row,$Col++] = $_.ReadOnly
+					# $WorksheetData[$Row,$Col++] = $_.IsDefault 
+					# $Row++ 
+					# }
 
 				}
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -8182,7 +8194,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 5; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -8356,7 +8368,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -8369,7 +8381,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 45; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -8423,7 +8435,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -8433,7 +8445,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'D2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -8479,7 +8491,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -8491,7 +8503,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 4; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -8549,28 +8561,28 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						} else {
 							$_.ObjectName
 						}
-						
+
 						$ObjectName = switch ($_.ObjectClass) {
-							'SQL Assembly'	{ " ON ASSEMBLY :: $ObjectName" }
-							'Asymmetric Key'	{ " ON ASYMMETRIC KEY :: $ObjectName" }
-							'Certificate'	{ " ON CERTIFICATE :: $ObjectName" }
-							'User'	{ " ON USER :: $ObjectName" }
-							'Database Role'	{ " ON ROLE :: $ObjectName" }
-							'Application Role'	{ " ON APPLICATION ROLE :: $ObjectName" }
-							'Full-Text Catalog'	{ " ON FULLTEXT CATALOG :: $ObjectName" }
-							'Full-Text Stop List'	{ " ON FULLTEXT STOPLIST :: $ObjectName" }
-							'Object Or Column'	{ $ObjectName }
-							'Schema'	{ " ON SCHEMA :: $ObjectName" }
-							'Service Contract'	{ " ON CONTRACT :: $ObjectName" }
-							'Message Type'	{ " ON MESSAGE TYPE :: $ObjectName" }
-							'Remote Service Binding'	{ " ON REMOTE SERVICE BINDING :: $ObjectName" }
-							'Service Route'	{ " ON ROUTE :: $ObjectName" }
-							'Service'	{ " ON SERVICE :: $ObjectName" }
-							'Symmetric Key'	{ " ON SYMMETRIC KEY :: $ObjectName" }
-							'User Defined Type'	{ " ON TYPE :: [$SchemaName].[$ObjectName]" }
-							'XML Namespace'	{ " ON XML SCHEMA COLLECTION :: [$SchemaName].[$ObjectName]" }
-							'Database'	{ [String]::Empty }
-							default	{ 'UNKNOWN' }
+							'SQL Assembly'{ " ON ASSEMBLY :: $ObjectName" }
+							'Asymmetric Key'{ " ON ASYMMETRIC KEY :: $ObjectName" }
+							'Certificate'{ " ON CERTIFICATE :: $ObjectName" }
+							'User'{ " ON USER :: $ObjectName" }
+							'Database Role'{ " ON ROLE :: $ObjectName" }
+							'Application Role'{ " ON APPLICATION ROLE :: $ObjectName" }
+							'Full-Text Catalog'{ " ON FULLTEXT CATALOG :: $ObjectName" }
+							'Full-Text Stop List'{ " ON FULLTEXT STOPLIST :: $ObjectName" }
+							'Object Or Column'{ $ObjectName }
+							'Schema'{ " ON SCHEMA :: $ObjectName" }
+							'Service Contract'{ " ON CONTRACT :: $ObjectName" }
+							'Message Type'{ " ON MESSAGE TYPE :: $ObjectName" }
+							'Remote Service Binding'{ " ON REMOTE SERVICE BINDING :: $ObjectName" }
+							'Service Route'{ " ON ROUTE :: $ObjectName" }
+							'Service'{ " ON SERVICE :: $ObjectName" }
+							'Symmetric Key'{ " ON SYMMETRIC KEY :: $ObjectName" }
+							'User Defined Type'{ " ON TYPE :: [$SchemaName].[$ObjectName]" }
+							'XML Namespace'{ " ON XML SCHEMA COLLECTION :: [$SchemaName].[$ObjectName]" }
+							'Database'{ [String]::Empty }
+							default{ 'UNKNOWN' }
 						}
 
 						if ($_.PermissionState -ieq 'Grant With Grant') {
@@ -8611,7 +8623,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -8675,7 +8687,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -8691,7 +8703,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 13; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -8759,7 +8771,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -8771,7 +8783,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 15; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -8820,7 +8832,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						else {
 							$Definition = "EXEC sp_addrolemember N'$($_.Name)', N'{0}';"
 						}
-						
+
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -8836,14 +8848,14 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 								$Definition -f @($_)
 							}
 						) -join $Delimiter # PoSH is more forgiving here than [String]::Join if $_.MemberOf is NULL
-						
+
 						$Row++
 					} 
 				}
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -8855,7 +8867,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -8905,7 +8917,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -8917,7 +8929,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -8965,7 +8977,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -8974,7 +8986,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'D2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -9028,7 +9040,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9037,7 +9049,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					FreezeAtCell = 'D2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -9099,7 +9111,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9113,7 +9125,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 12; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -9173,7 +9185,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9185,7 +9197,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -9194,198 +9206,198 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			# Worksheet X: Database Security - Audit Specifications
 
 
-			# 			# Worksheet 48: Agent Configuration (VERTICAL FORMAT)
-			# 			$ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Agent Configuration"
-			# 			Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
-			# 			Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
+			# # Worksheet 48: Agent Configuration (VERTICAL FORMAT)
+			# $ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Agent Configuration"
+			# Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
+			# Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
 			#region
-			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
-			# 			$Worksheet.Name = 'Agent Config'
-			# 			$Worksheet.Tab.ThemeColor = $AgentTabColor
+			# $Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
+			# $Worksheet.Name = 'Agent Config'
+			# $Worksheet.Tab.ThemeColor = $AgentTabColor
 			# 
-			# 			#$ColumnCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.Agent.Configuration } | Measure-Object).Count + 1
+			# #$ColumnCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.Agent.Configuration } | Measure-Object).Count + 1
 			# 
-			# 			# Option 1: Report only instances that have the SQL Agent enabled
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Configuration } ) | Measure-Object).Count + 1
+			# # Option 1: Report only instances that have the SQL Agent enabled
+			# $ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Configuration } ) | Measure-Object).Count + 1
 			# 
-			# 			# Option 2: Report all instances, leave blanks for those that don't have the SQL Agent enabled
-			# 			#$ColumnCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			# # Option 2: Report all instances, leave blanks for those that don't have the SQL Agent enabled
+			# #$ColumnCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
 			# 
-			# 			$RowCount = 50
-			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
+			# $RowCount = 50
+			# $WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
-			# 			$Row = 0
-			# 			$WorksheetData[$Row++,0] = 'Server Name'
-			# 			$WorksheetData[$Row++,0] = 'General'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Name'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Server Type'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Agent Service'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Auto Restart SQL Server'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Auto Restart SQL Server Agent'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Error Log'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'File Name'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Log Level'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Include Execution Trace Messages'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Write Oem File'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Net Send Recipient'
-			# 			#13 
-			# 			$WorksheetData[$Row++,0] = 'Advanced'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'SQL Server Event Forwarding'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Server'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Events To Forward'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Severity At Or Above'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Idle CPU Condition'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Avg CPU Usage Falls Below (%)'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Time CPU Remains Below (sec)'
-			# 			# 23
-			# 			$WorksheetData[$Row++,0] = 'Alert System'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Mail Session'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Is Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Mail System'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Mail Profile'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Save Sent Messages'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Pager Emails'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'To Template'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Cc Template'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Subject'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Include Body In Notification'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Failsafe Operator'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Operator'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Notification Method'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Email Address'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Pager Address'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Net Send Address'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Token Replacement'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Replace Alert Tokens'
-			# 			# 42
-			# 			$WorksheetData[$Row++,0] = 'Job System'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Shutdown Time-Out Interval (sec)'
-			# 			# 44
-			# 			$WorksheetData[$Row++,0] = 'Connection'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Alias Local Host Server'
-			# 			#$WorksheetData[$Row++,0] = $IndentString__2 + 'SQL Server Connection'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Login Timeout (sec)'
-			# 			# 47
-			# 			$WorksheetData[$Row++,0] = 'History'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Max Job History Total Rows'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Max Job History Rows Per Job'
-			# 			# 50
+			# $Row = 0
+			# $WorksheetData[$Row++,0] = 'Server Name'
+			# $WorksheetData[$Row++,0] = 'General'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Name'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Server Type'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Agent Service'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Auto Restart SQL Server'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Auto Restart SQL Server Agent'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Error Log'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'File Name'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Log Level'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Include Execution Trace Messages'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Write Oem File'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Net Send Recipient'
+			# #13 
+			# $WorksheetData[$Row++,0] = 'Advanced'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'SQL Server Event Forwarding'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Server'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Events To Forward'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Severity At Or Above'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Idle CPU Condition'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Avg CPU Usage Falls Below (%)'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Time CPU Remains Below (sec)'
+			# # 23
+			# $WorksheetData[$Row++,0] = 'Alert System'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Mail Session'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Is Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Mail System'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Mail Profile'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Save Sent Messages'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Pager Emails'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'To Template'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Cc Template'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Subject'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Include Body In Notification'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Failsafe Operator'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Operator'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Notification Method'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Email Address'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Pager Address'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Net Send Address'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Token Replacement'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Replace Alert Tokens'
+			# # 42
+			# $WorksheetData[$Row++,0] = 'Job System'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Shutdown Time-Out Interval (sec)'
+			# # 44
+			# $WorksheetData[$Row++,0] = 'Connection'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Alias Local Host Server'
+			# #$WorksheetData[$Row++,0] = $IndentString__2 + 'SQL Server Connection'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Login Timeout (sec)'
+			# # 47
+			# $WorksheetData[$Row++,0] = 'History'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Max Job History Total Rows'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Max Job History Rows Per Job'
+			# # 50
 			# 
 			# 
-			# 			$Col = 1
+			# $Col = 1
 			# 
-			# 			# Option 1: Report only instances that have the SQL Agent enabled
-			# 			$SqlServerInventory.DatabaseServer | Where-Object { $_.Agent.Configuration } | Sort-Object -Property $_.ServerName | ForEach-Object {
+			# # Option 1: Report only instances that have the SQL Agent enabled
+			# $SqlServerInventory.DatabaseServer | Where-Object { $_.Agent.Configuration } | Sort-Object -Property $_.ServerName | ForEach-Object {
 			# 
-			# 				# Option 2: Report all instances, leave blanks for those that don't have the SQL Agent enabled
-			# 				#$SqlServerInventory.DatabaseServer | Sort-Object -Property $_.ServerName | ForEach-Object {
-			# 				$Row = 0
+			# # Option 2: Report all instances, leave blanks for those that don't have the SQL Agent enabled
+			# #$SqlServerInventory.DatabaseServer | Sort-Object -Property $_.ServerName | ForEach-Object {
+			# $Row = 0
 			# 
-			# 				# General
-			# 				$WorksheetData[$Row++,$Col] = $_.ServerName
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.Name
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ServerType
+			# # General
+			# $WorksheetData[$Row++,$Col] = $_.ServerName
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.Name
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ServerType
 			# 
-			# 				# General - Agent Service
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.AgentService.AutoRestartSqlAgent
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.AgentService.AutoRestartSqlServer
+			# # General - Agent Service
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.AgentService.AutoRestartSqlAgent
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.AgentService.AutoRestartSqlServer
 			# 
-			# 				# General - Error Log
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.FileName
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.LogLevel
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.IncludeExecutionTraceMessages
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.WriteOemFile
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.NetSendRecipient
+			# # General - Error Log
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.FileName
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.LogLevel
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.IncludeExecutionTraceMessages
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.WriteOemFile
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.General.ErrorLog.NetSendRecipient
 			# 
-			# 				# Advanced
-			# 				$WorksheetData[$Row++,$Col] = $null
+			# # Advanced
+			# $WorksheetData[$Row++,$Col] = $null
 			# 
-			# 				# Advanced - SQL Server Event Forwarding
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.IsEnabled
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.Server
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.EventsToForward
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.SeverityAtOrAbove
+			# # Advanced - SQL Server Event Forwarding
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.IsEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.Server
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.EventsToForward
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.EventForwarding.SeverityAtOrAbove
 			# 
-			# 				# Advanced - Idle CPU Condition
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.IdleCpuCondition.IsEnabled
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.IdleCpuCondition.AvgCpuBelowPercent
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.IdleCpuCondition.AvgCpuRemainsForSeconds
+			# # Advanced - Idle CPU Condition
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.IdleCpuCondition.IsEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.IdleCpuCondition.AvgCpuBelowPercent
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Advanced.IdleCpuCondition.AvgCpuRemainsForSeconds
 			# 
-			# 				# Alert System
-			# 				$WorksheetData[$Row++,$Col] = $null
+			# # Alert System
+			# $WorksheetData[$Row++,$Col] = $null
 			# 
-			# 				# Alert System - Mail Session
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.IsEnabled
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.MailSystem
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.MailProfile
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.SaveSentMessages
+			# # Alert System - Mail Session
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.IsEnabled
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.MailSystem
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.MailProfile
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.MailSession.SaveSentMessages
 			# 
-			# 				# Alert System - Pager Emails
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.ToTemplate
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.CcTemplate
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.Subject
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.IncludeBody
+			# # Alert System - Pager Emails
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.ToTemplate
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.CcTemplate
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.Subject
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.PagerEmails.IncludeBody
 			# 
-			# 				# Alert System - Failsafe Operator
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.Operator
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.NotificationMethod
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.FailSafeEmailAddress
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.FailSafePagerAddress
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.FailSafeNetSendAddress
+			# # Alert System - Failsafe Operator
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.Operator
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.NotificationMethod
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.FailSafeEmailAddress
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.FailSafePagerAddress
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.FailSafeOperator.FailSafeNetSendAddress
 			# 
-			# 				# Alert System - Token Replacement
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.TokenReplacement.ReplaceAlertTokens
+			# # Alert System - Token Replacement
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.AlertSystem.TokenReplacement.ReplaceAlertTokens
 			# 
-			# 				# Job System
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.JobSystem.ShutdownTimeoutIntervalSeconds
+			# # Job System
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.JobSystem.ShutdownTimeoutIntervalSeconds
 			# 
-			# 				# Connection
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Connection.AliasLocalHostServer
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Connection.LoginTimeoutSeconds
+			# # Connection
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Connection.AliasLocalHostServer
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.Connection.LoginTimeoutSeconds
 			# 
-			# 				# Connection
-			# 				$WorksheetData[$Row++,$Col] = $null
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.History.MaxJobHistoryTotalRows
-			# 				$WorksheetData[$Row++,$Col] = $_.Agent.Configuration.History.MaxJobHistoryRowsPerJob
+			# # Connection
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.History.MaxJobHistoryTotalRows
+			# $WorksheetData[$Row++,$Col] = $_.Agent.Configuration.History.MaxJobHistoryRowsPerJob
 			# 
-			# 				$Col++
-			# 			}
-			# 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
-			# 			$Range.Value2 = $WorksheetData
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			# $Col++
+			# }
+			# $Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
+			# $Range.Value2 = $WorksheetData
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 			# 
-			# 			$WorksheetFormat.Add($WorksheetNumber, @{
-			# 					BoldFirstRow = $false
-			# 					BoldFirstColumn = $true
-			# 					AutoFilter = $false
-			# 					FreezeAtCell = 'B2'
-			# 					ColumnFormat = @()
-			# 					RowFormat = @(
-			# 						@{RowNumber = 22; NumberFormat = $XlNumFmtNumberGeneral},
-			# 						@{RowNumber = 23; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 44; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 47; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 49; NumberFormat = $XlNumFmtNumberS0},
-			# 						@{RowNumber = 50; NumberFormat = $XlNumFmtNumberS0}
-			# 					)
-			# 				})
+			# $WorksheetFormat.Add($WorksheetNumber, @{
+			# BoldFirstRow = $false
+			# BoldFirstColumn = $true
+			# AutoFilter = $false
+			# FreezeAtCell = 'B2'
+			# ColumnFormat = @()
+			# RowFormat = @(
+			# @{RowNumber = 22; NumberFormat = $XlNumFmtNumberGeneral},
+			# @{RowNumber = 23; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 44; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 47; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 49; NumberFormat = $XlNumFmtNumberS0},
+			# @{RowNumber = 50; NumberFormat = $XlNumFmtNumberS0}
+			# )
+			# })
 			# 
-			# 			$WorksheetNumber++
+			# $WorksheetNumber++
 			#endregion
 
 
@@ -9559,7 +9571,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
@@ -9577,7 +9589,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 50; NumberFormat = $XlNumFmtNumberS0} 
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -9634,7 +9646,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9648,7 +9660,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 10; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -9722,7 +9734,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(5), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(5), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9738,7 +9750,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 16; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -9791,7 +9803,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(4), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(4), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9802,7 +9814,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -9871,7 +9883,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 										$_.OperatorName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
 									}
-								))
+							))
 						} else {
 							[String]::Empty
 						}
@@ -9881,7 +9893,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(4), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(4), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9892,7 +9904,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -9945,7 +9957,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -9955,7 +9967,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					ColumnFormat = @(
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -10034,7 +10046,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 									$_.OperatorName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
 
 								} 
-							)) 
+						)) 
 					} else {
 						[String]::Empty
 					}
@@ -10050,7 +10062,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -10066,162 +10078,162 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 23; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
 
 
-			# 			# Worksheet 55: Agent Operators  (VERTICAL FORMAT)
-			# 			$ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Agent Operators"
-			# 			Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
-			# 			Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
+			# # Worksheet 55: Agent Operators  (VERTICAL FORMAT)
+			# $ProgressStatus = "Writing Worksheet #$($WorksheetNumber): Agent Operators"
+			# Write-SqlServerInventoryLog -Message $ProgressStatus -MessageLevel Verbose
+			# Write-Progress -Activity $ProgressActivity -PercentComplete (($WorksheetNumber / ($WorksheetCount * 2)) * 100) -Status $ProgressStatus -Id $ProgressId -ParentId $ParentProgressId
 			#region
-			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
-			# 			$Worksheet.Name = 'Agent Operators 2'
-			# 			$Worksheet.Tab.ThemeColor = $AgentTabColor
+			# $Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
+			# $Worksheet.Name = 'Agent Operators 2'
+			# $Worksheet.Tab.ThemeColor = $AgentTabColor
 			# 
-			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
-			# 			#$ColumnCount = 15
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Operators } ) | Measure-Object).Count + 1
-			# 			$RowCount = 24
-			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
+			# #$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
+			# #$ColumnCount = 15
+			# $ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Operators } ) | Measure-Object).Count + 1
+			# $RowCount = 24
+			# $WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
-			# 			$Row = 0
-			# 			$WorksheetData[$Row++,0] = 'Server Name'
-			# 			$WorksheetData[$Row++,0] = 'Operator Name'
-			# 			# 2
-			# 			$WorksheetData[$Row++,0] = 'General'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Category'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Enabled'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Notification Options'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'E-mail name'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Net send address'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Pager e-mail name'
-			# 			# 9
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Pager On Duty Schedule'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'On Duty Days'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Mon-Fri Workday Begin'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Mon-Fri Workday End'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Sat Workday Begin'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Sat Workday End'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Sun Workday Begin'
-			# 			$WorksheetData[$Row++,0] = $IndentString__2 + 'Sun Workday End'
-			# 			# 17
-			# 			$WorksheetData[$Row++,0] = 'Notifications'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Alerts'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Jobs'
-			# 			# 20
-			# 			$WorksheetData[$Row++,0] = 'History'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Last E-mail'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Last Pager'
-			# 			$WorksheetData[$Row++,0] = $IndentString_1 + 'Last Net Send'
-			# 			# 24
-			# 
-			# 
-			# 			$Col = 1
-			# 			$SqlServerInventory.DatabaseServer | Sort-Object -Property $_.ServerName | ForEach-Object {
-			# 
-			# 				$ServerName = $_.Server.Configuration.General.Name
-			# 
-			# 				$_.Agent.Operators | Where-Object { $_.General.ID } | Sort-Object -Property $_.General.Name | ForEach-Object {
-			# 
-			# 					$Row = 0
-			# 
-			# 					$WorksheetData[$Row++,$Col] = $ServerName
-			# 					$WorksheetData[$Row++,$Col] = $_.General.Name
-			# 					$WorksheetData[$Row++,$Col] = $_.General.CategoryName
-			# 					$WorksheetData[$Row++,$Col] = $_.General.IsEnabled
-			# 
-			# 					# General - Notification Options
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.General.NotificationOptions.EmailAddress
-			# 					$WorksheetData[$Row++,$Col] = $_.General.NotificationOptions.NetSendAddress
-			# 					$WorksheetData[$Row++,$Col] = $_.General.NotificationOptions.PagerAddress
-			# 
-			# 					# General - Pager on duty schedule
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.OnDutyDays
-			# 					$WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.WeekdayStartTime
-			# 					$WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.WeekdayEndTime
-			# 					$WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SaturdayStartTime
-			# 					$WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SaturdayEndTime
-			# 					$WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SundayStartTime
-			# 					$WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SundayEndTime
-			# 
-			# 					# Notifications
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = if (($_.Notifications.Alerts | Measure-Object).Count -gt 0) {
-			# 						[String]::Join('`n', @(
-			# 							$_.Notifications.Alerts | Where-Object { $_.AlertId } | ForEach-Object {
-			# 		
-			# 								$NotifyMethod = @()
-			# 								if ($_.UseEmail) { $NotifyMethod += 'E-mail' }
-			# 								if ($_.UsePager) { $NotifyMethod += 'Pager' }
-			# 								if ($_.UseNetSend) { $NotifyMethod += 'Net Send' }						
-			# 							
-			# 								$_.AlertName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
-			# 								
-			# 							}							
-			# 						))					
-			# 					} else {
-			# 						[String]::Empty
-			# 					}
-			# 					
-			# 					$WorksheetData[$Row++,$Col] = if (($_.Notifications.Jobs | Measure-Object).Count -gt 0) {
-			# 						[String]::Join('`n', @(
-			# 							$_.Notifications.Jobs | Where-Object { $_.JobId } | ForEach-Object {
-			# 		
-			# 								$NotifyMethod = @()
-			# 								if ($_.UseEmail) { $NotifyMethod += 'E-mail' }
-			# 								if ($_.UsePager) { $NotifyMethod += 'Pager' }
-			# 								if ($_.UseNetSend) { $NotifyMethod += 'Net Send' }						
-			# 							
-			# 								$_.JobName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
-			# 								
-			# 							}							
-			# 						))					
-			# 					} else {
-			# 						[String]::Empty
-			# 					}
+			# $Row = 0
+			# $WorksheetData[$Row++,0] = 'Server Name'
+			# $WorksheetData[$Row++,0] = 'Operator Name'
+			# # 2
+			# $WorksheetData[$Row++,0] = 'General'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Category'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Enabled'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Notification Options'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'E-mail name'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Net send address'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Pager e-mail name'
+			# # 9
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Pager On Duty Schedule'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'On Duty Days'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Mon-Fri Workday Begin'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Mon-Fri Workday End'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Sat Workday Begin'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Sat Workday End'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Sun Workday Begin'
+			# $WorksheetData[$Row++,0] = $IndentString__2 + 'Sun Workday End'
+			# # 17
+			# $WorksheetData[$Row++,0] = 'Notifications'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Alerts'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Jobs'
+			# # 20
+			# $WorksheetData[$Row++,0] = 'History'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Last E-mail'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Last Pager'
+			# $WorksheetData[$Row++,0] = $IndentString_1 + 'Last Net Send'
+			# # 24
 			# 
 			# 
-			# 					# History
-			# 					$WorksheetData[$Row++,$Col] = $null
-			# 					$WorksheetData[$Row++,$Col] = $_.History.LastEmailDate
-			# 					$WorksheetData[$Row++,$Col] = $_.History.LastPagerDate
-			# 					$WorksheetData[$Row++,$Col] = $_.History.LastNetSendDate
+			# $Col = 1
+			# $SqlServerInventory.DatabaseServer | Sort-Object -Property $_.ServerName | ForEach-Object {
 			# 
-			# 					$Col++
+			# $ServerName = $_.Server.Configuration.General.Name
 			# 
-			# 				}
-			# 			}
-			# 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
-			# 			$Range.Value2 = $WorksheetData
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			# 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			# $_.Agent.Operators | Where-Object { $_.General.ID } | Sort-Object -Property $_.General.Name | ForEach-Object {
 			# 
-			# 			$WorksheetFormat.Add($WorksheetNumber, @{
-			# 					BoldFirstRow = $false
-			# 					BoldFirstColumn = $true
-			# 					AutoFilter = $false
-			# 					FreezeAtCell = 'B2'
-			# 					ColumnFormat = @()
-			# 					RowFormat = @(
-			# 						@{RowNumber = 12; NumberFormat = $XlNumFmtTime},
-			# 						@{RowNumber = 13; NumberFormat = $XlNumFmtTime},
-			# 						@{RowNumber = 14; NumberFormat = $XlNumFmtTime},
-			# 						@{RowNumber = 15; NumberFormat = $XlNumFmtTime},
-			# 						@{RowNumber = 16; NumberFormat = $XlNumFmtTime},
-			# 						@{RowNumber = 17; NumberFormat = $XlNumFmtTime},
-			# 						@{RowNumber = 22; NumberFormat = $XlNumFmtDate},
-			# 						@{RowNumber = 23; NumberFormat = $XlNumFmtDate},
-			# 						@{RowNumber = 24; NumberFormat = $XlNumFmtDate}
-			# 					)
-			# 				})
+			# $Row = 0
 			# 
-			# 			$WorksheetNumber++
+			# $WorksheetData[$Row++,$Col] = $ServerName
+			# $WorksheetData[$Row++,$Col] = $_.General.Name
+			# $WorksheetData[$Row++,$Col] = $_.General.CategoryName
+			# $WorksheetData[$Row++,$Col] = $_.General.IsEnabled
+			# 
+			# # General - Notification Options
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.General.NotificationOptions.EmailAddress
+			# $WorksheetData[$Row++,$Col] = $_.General.NotificationOptions.NetSendAddress
+			# $WorksheetData[$Row++,$Col] = $_.General.NotificationOptions.PagerAddress
+			# 
+			# # General - Pager on duty schedule
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.OnDutyDays
+			# $WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.WeekdayStartTime
+			# $WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.WeekdayEndTime
+			# $WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SaturdayStartTime
+			# $WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SaturdayEndTime
+			# $WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SundayStartTime
+			# $WorksheetData[$Row++,$Col] = $_.General.OnDutySchedule.SundayEndTime
+			# 
+			# # Notifications
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = if (($_.Notifications.Alerts | Measure-Object).Count -gt 0) {
+			# [String]::Join('`n', @(
+			# $_.Notifications.Alerts | Where-Object { $_.AlertId } | ForEach-Object {
+			# 
+			# $NotifyMethod = @()
+			# if ($_.UseEmail) { $NotifyMethod += 'E-mail' }
+			# if ($_.UsePager) { $NotifyMethod += 'Pager' }
+			# if ($_.UseNetSend) { $NotifyMethod += 'Net Send' }
+			# 
+			# $_.AlertName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
+			# 
+			# }
+			# ))
+			# } else {
+			# [String]::Empty
+			# }
+			# 
+			# $WorksheetData[$Row++,$Col] = if (($_.Notifications.Jobs | Measure-Object).Count -gt 0) {
+			# [String]::Join('`n', @(
+			# $_.Notifications.Jobs | Where-Object { $_.JobId } | ForEach-Object {
+			# 
+			# $NotifyMethod = @()
+			# if ($_.UseEmail) { $NotifyMethod += 'E-mail' }
+			# if ($_.UsePager) { $NotifyMethod += 'Pager' }
+			# if ($_.UseNetSend) { $NotifyMethod += 'Net Send' }
+			# 
+			# $_.JobName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
+			# 
+			# }
+			# ))
+			# } else {
+			# [String]::Empty
+			# }
+			# 
+			# 
+			# # History
+			# $WorksheetData[$Row++,$Col] = $null
+			# $WorksheetData[$Row++,$Col] = $_.History.LastEmailDate
+			# $WorksheetData[$Row++,$Col] = $_.History.LastPagerDate
+			# $WorksheetData[$Row++,$Col] = $_.History.LastNetSendDate
+			# 
+			# $Col++
+			# 
+			# }
+			# }
+			# $Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
+			# $Range.Value2 = $WorksheetData
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			# #$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			# 
+			# $WorksheetFormat.Add($WorksheetNumber, @{
+			# BoldFirstRow = $false
+			# BoldFirstColumn = $true
+			# AutoFilter = $false
+			# FreezeAtCell = 'B2'
+			# ColumnFormat = @()
+			# RowFormat = @(
+			# @{RowNumber = 12; NumberFormat = $XlNumFmtTime},
+			# @{RowNumber = 13; NumberFormat = $XlNumFmtTime},
+			# @{RowNumber = 14; NumberFormat = $XlNumFmtTime},
+			# @{RowNumber = 15; NumberFormat = $XlNumFmtTime},
+			# @{RowNumber = 16; NumberFormat = $XlNumFmtTime},
+			# @{RowNumber = 17; NumberFormat = $XlNumFmtTime},
+			# @{RowNumber = 22; NumberFormat = $XlNumFmtDate},
+			# @{RowNumber = 23; NumberFormat = $XlNumFmtDate},
+			# @{RowNumber = 24; NumberFormat = $XlNumFmtDate}
+			# )
+			# })
+			# 
+			# $WorksheetNumber++
 			#endregion
 
 
@@ -10296,7 +10308,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 									$_.AlertName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
 
 								} 
-							)) 
+						)) 
 					} else {
 						[String]::Empty
 					}
@@ -10313,7 +10325,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 									$_.JobName + ' (' + [String]::Join(',', $NotifyMethod) + ')'
 
 								} 
-							)) 
+						)) 
 					} else {
 						[String]::Empty
 					}
@@ -10323,7 +10335,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			}
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -10342,7 +10354,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion 
@@ -10363,25 +10375,25 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 				$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 
 				# Switch to the worksheet
-				$Worksheet.Activate() | Out-Null
+				$null = $Worksheet.Activate()
 
 				# Bold the header row
 				$Duration = (Measure-Command {
 						$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Debug
 
 				# Bold the 1st column
 				$Duration = (Measure-Command {
 						$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Debug
 
 				# Freeze View
 				$Duration = (Measure-Command {
 						$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
 						$Worksheet.Application.ActiveWindow.FreezePanes = $true 
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Debug
 
 
@@ -10390,7 +10402,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
 							$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Apply Row formatting
@@ -10398,7 +10410,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
 							$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Update worksheet values so row and column formatting apply
@@ -10407,7 +10419,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 							$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
 						} catch {
 							# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
-							# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
+							# "Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
 							# See http://support.microsoft.com/kb/313275 for more information
 							# When this happens the workaround is to try doing the work in smaller chunks
 							# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
@@ -10418,7 +10430,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 								$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
 							}
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Debug
 
 
@@ -10429,45 +10441,45 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 						$ListObject.TableStyle = $TableStyle
 						$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
 						$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Zoom back to 80%
 				$Duration = (Measure-Command {
 						$Worksheet.Application.ActiveWindow.Zoom = 80
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Debug
 
 				# Adjust the column widths to 250 before autofitting contents
 				# This allows longer lines of text to remain on one line
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Debug
 
 				# Autofit column and row contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
 						$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Left align contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Vertical align contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Put the selection back to the upper left cell
 				$Duration = (Measure-Command {
 						$Worksheet.Range('A1').Select() | Out-Null
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Debug
 			}
 
@@ -10554,81 +10566,81 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Writes an Excel file containing the Database Engine Assessment information from an assessment of a SQL Server Inventory.
 
-	.DESCRIPTION
+		.DESCRIPTION
 		The Export-SqlServerInventoryDatabaseEngineConfigToExcel function uses COM Interop to write an Excel file containing the Database Engine Assessment information from an assessment of a SQL Server Inventory.
-				
+
 		Microsoft Excel 2007 or higher must be installed in order to write the Excel file.
-		
-	.PARAMETER  DatabaseEngineAssessment
+
+		.PARAMETER  DatabaseEngineAssessment
 		A SQL Server Inventory Database Engine Assessment object returned by Get-SqlServerInventoryDatabaseEngineAssessment.
-		
-	.PARAMETER  Path
+
+		.PARAMETER  Path
 		Specifies the path where the Excel file will be written. This is a fully qualified path to a .XLSX file.
-		
+
 		If not specified then the file is named "SQL Server Inventory - [Year][Month][Day][Hour][Minute] - Database Engine Assessment.xlsx" and is written to your "My Documents" folder.
 
-	.PARAMETER  ColorTheme
+		.PARAMETER  ColorTheme
 		An Office Theme Color to apply to each worksheet. If not specified or if an unknown theme color is provided the default "Office" theme colors will be used.
-		
+
 		Office 2013 theme colors include: Aspect, Blue Green, Blue II, Blue Warm, Blue, Grayscale, Green Yellow, Green, Marquee, Median, Office, Office 2007 - 2010, Orange Red, Orange, Paper, Red Orange, Red Violet, Red, Slipstream, Violet II, Violet, Yellow Orange, Yellow
-		
+
 		Office 2010 theme colors include: Adjacency, Angles, Apex, Apothecary, Aspect, Austin, Black Tie, Civic, Clarity, Composite, Concourse, Couture, Elemental, Equity, Essential, Executive, Flow, Foundry, Grayscale, Grid, Hardcover, Horizon, Median, Metro, Module, Newsprint, Office, Opulent, Oriel, Origin, Paper, Perspective, Pushpin, Slipstream, Solstice, Technic, Thatch, Trek, Urban, Verve, Waveform
 
 		Office 2007 theme colors include: Apex, Aspect, Civic, Concourse, Equity, Flow, Foundry, Grayscale, Median, Metro, Module, Office, Opulent, Oriel, Origin, Paper, Solstice, Technic, Trek, Urban, Verve
-		
-	.PARAMETER  ColorScheme
+
+		.PARAMETER  ColorScheme
 		The color theme to apply to each worksheet. Valid values are "Light", "Medium", and "Dark". 
-		
+
 		If not specified then "Medium" is used as the default value .
-		
-	.PARAMETER  ParentProgressId
-		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID			
-		
-	.EXAMPLE
+
+		.PARAMETER  ParentProgressId
+		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID
+
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineAssessmentToExcel -DatabaseEngineAssessment $DbEngineAssessment 
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory Database Engine Assessment contained in $DbEngineAssessment.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
-		
-	.EXAMPLE
+
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineAssessmentToExcel -DatabaseEngineAssessment $DbEngineAssessment -Path 'C:\DB Engine Inventory Assessment.xlsx'
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory Database Engine Assessment contained in $DbEngineAssessment.
 
 		The Excel workbook will be written to your C:\DB Engine Inventory.xlsx.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
 
-	.EXAMPLE
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineAssessmentToExcel -DatabaseEngineAssessment $Inventory -ColorTheme Blue -ColorScheme Dark
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory Database Engine Assessment contained in $DbEngineAssessment.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Blue color theme and Dark color scheme will be used.
-	
-	.NOTES
+
+		.NOTES
 		Blue and Green are nice looking Color Themes for Office 2013
 
 		Waveform is a nice looking Color Theme for Office 2010
 
-	.LINK
+		.LINK
 		Get-SqlServerInventory
 		Get-SqlServerInventoryDatabaseEngineAssessment
-#>
+	#>
 	[cmdletBinding()]
 	param(
 		[Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -10662,30 +10674,30 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 
 
 		<#
-	.LINK
-		"Export Windows PowerShell Data to Excel" (http://technet.microsoft.com/en-us/query/dd297620)
-		
-	.LINK
-		"Microsoft.Office.Interop.Excel Namespace" (http://msdn.microsoft.com/en-us/library/office/microsoft.office.interop.excel(v=office.14).aspx)
-		
-	.LINK
-		"Excel Object Model Reference" (http://msdn.microsoft.com/en-us/library/ff846392.aspx)
-		
-	.LINK
-		"Excel 2010 Enumerations" (http://msdn.microsoft.com/en-us/library/ff838815.aspx)
-		
-	.LINK
-		"TableStyle Cheat Sheet in French/English" (http://msdn.microsoft.com/fr-fr/library/documentformat.openxml.spreadsheet.tablestyle.aspx)
-		
-	.LINK
-		"Color Palette and the 56 Excel ColorIndex Colors" (http://dmcritchie.mvps.org/excel/colors.htm)
-		
-	.LINK
-		"Adding Color to Excel 2007 Worksheets by Using the ColorIndex Property" (http://msdn.microsoft.com/en-us/library/cc296089(v=office.12).aspx)
-		
-	.LINK
-		"XlRgbColor Enumeration" (http://msdn.microsoft.com/en-us/library/ff197459.aspx)
-#>
+			.LINK
+			"Export Windows PowerShell Data to Excel" (http://technet.microsoft.com/en-us/query/dd297620)
+
+			.LINK
+			"Microsoft.Office.Interop.Excel Namespace" (http://msdn.microsoft.com/en-us/library/office/microsoft.office.interop.excel(v=office.14).aspx)
+
+			.LINK
+			"Excel Object Model Reference" (http://msdn.microsoft.com/en-us/library/ff846392.aspx)
+
+			.LINK
+			"Excel 2010 Enumerations" (http://msdn.microsoft.com/en-us/library/ff838815.aspx)
+
+			.LINK
+			"TableStyle Cheat Sheet in French/English" (http://msdn.microsoft.com/fr-fr/library/documentformat.openxml.spreadsheet.tablestyle.aspx)
+
+			.LINK
+			"Color Palette and the 56 Excel ColorIndex Colors" (http://dmcritchie.mvps.org/excel/colors.htm)
+
+			.LINK
+			"Adding Color to Excel 2007 Worksheets by Using the ColorIndex Property" (http://msdn.microsoft.com/en-us/library/cc296089(v=office.12).aspx)
+
+			.LINK
+			"XlRgbColor Enumeration" (http://msdn.microsoft.com/en-us/library/ff197459.aspx)
+		#>
 
 
 
@@ -10786,7 +10798,7 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 
 
 		# Add enough worksheets to get us to $WorksheetCount
-		$Excel.Worksheets.Add($MissingType, $Excel.Worksheets.Item($Excel.Worksheets.Count), $WorksheetCount - $Excel.Worksheets.Count, $Excel.Worksheets.Item(1).Type) | Out-Null
+		$null = $Excel.Worksheets.Add($MissingType, $Excel.Worksheets.Item($Excel.Worksheets.Count), $WorksheetCount - $Excel.Worksheets.Count, $Excel.Worksheets.Item(1).Type)
 		$WorksheetNumber = 1
 
 		try {
@@ -10844,7 +10856,7 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 						FreezeAtCell = 'C2'
 						ColumnFormat = @()
 						RowFormat = @()
-					})
+				})
 
 				$WorksheetNumber++
 				#endregion
@@ -10867,25 +10879,25 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 				$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 
 				# Switch to the worksheet
-				$Worksheet.Activate() | Out-Null
+				$null = $Worksheet.Activate()
 
 				# Bold the header row
 				$Duration = (Measure-Command {
 						$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Debug
 
 				# Bold the 1st column
 				$Duration = (Measure-Command {
 						$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Debug
 
 				# Freeze View
 				$Duration = (Measure-Command {
 						$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
 						$Worksheet.Application.ActiveWindow.FreezePanes = $true 
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Debug
 
 
@@ -10894,7 +10906,7 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 						$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
 							$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Apply Row formatting
@@ -10902,7 +10914,7 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 						$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
 							$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Update worksheet values so row and column formatting apply
@@ -10911,7 +10923,7 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 							$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
 						} catch {
 							# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
-							# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
+							# "Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
 							# See http://support.microsoft.com/kb/313275 for more information
 							# When this happens the workaround is to try doing the work in smaller chunks
 							# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
@@ -10922,7 +10934,7 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 								$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
 							}
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Debug
 
 
@@ -10933,51 +10945,51 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 						$ListObject.TableStyle = $TableStyle
 						$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
 						$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Zoom back to 80%
 				$Duration = (Measure-Command {
 						$Worksheet.Application.ActiveWindow.Zoom = 80
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Debug
 
 				# Adjust the column widths to 150 before autofitting contents
 				# This allows longer lines of text to remain on one line
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.ColumnWidth = 150
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Debug
 
 				# Wrap text
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.WrapText = $true
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Wrap text Duration (ms): $Duration" -MessageLevel Debug
 
 				# Autofit column and row contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
 						$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Left align contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Vertical align contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Put the selection back to the upper left cell
 				$Duration = (Measure-Command {
 						$Worksheet.Range('A1').Select() | Out-Null
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Debug
 			}
 
@@ -11064,83 +11076,83 @@ function Export-SqlServerInventoryDatabaseEngineAssessmentToExcel {
 
 function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 	<#
-	.SYNOPSIS
+		.SYNOPSIS
 		Writes an Excel file containing the Database Engine Database Object information in a SQL Server Inventory.
 
-	.DESCRIPTION
+		.DESCRIPTION
 		The Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel function uses COM Interop to write an Excel file containing the Database Engine Database Objects information in a SQL Server Inventory returned by Get-SqlServerInventory.
-		
+
 		Although the SQL Server Shared Management Objects (SMO) libraries are required to perform an inventory they are NOT required to write the Excel file.
-		
+
 		Microsoft Excel 2007 or higher must be installed in order to write the Excel file.
-		
-	.PARAMETER  SqlServerInventory
+
+		.PARAMETER  SqlServerInventory
 		A SQL Server Inventory object returned by Get-SqlServerInventory.
-		
-	.PARAMETER  Path
+
+		.PARAMETER  Path
 		Specifies the path where the Excel file will be written. This is a fully qualified path to a .XLSX file.
-		
+
 		If not specified then the file is named "SQL Server Inventory - [Year][Month][Day][Hour][Minute] - Database Engine Db Objects.xlsx" and is written to your "My Documents" folder.
 
-	.PARAMETER  ColorTheme
+		.PARAMETER  ColorTheme
 		An Office Theme Color to apply to each worksheet. If not specified or if an unknown theme color is provided the default "Office" theme colors will be used.
-		
+
 		Office 2013 theme colors include: Aspect, Blue Green, Blue II, Blue Warm, Blue, Grayscale, Green Yellow, Green, Marquee, Median, Office, Office 2007 - 2010, Orange Red, Orange, Paper, Red Orange, Red Violet, Red, Slipstream, Violet II, Violet, Yellow Orange, Yellow
-		
+
 		Office 2010 theme colors include: Adjacency, Angles, Apex, Apothecary, Aspect, Austin, Black Tie, Civic, Clarity, Composite, Concourse, Couture, Elemental, Equity, Essential, Executive, Flow, Foundry, Grayscale, Grid, Hardcover, Horizon, Median, Metro, Module, Newsprint, Office, Opulent, Oriel, Origin, Paper, Perspective, Pushpin, Slipstream, Solstice, Technic, Thatch, Trek, Urban, Verve, Waveform
 
 		Office 2007 theme colors include: Apex, Aspect, Civic, Concourse, Equity, Flow, Foundry, Grayscale, Median, Metro, Module, Office, Opulent, Oriel, Origin, Paper, Solstice, Technic, Trek, Urban, Verve
-		
-	.PARAMETER  ColorScheme
+
+		.PARAMETER  ColorScheme
 		The color theme to apply to each worksheet. Valid values are "Light", "Medium", and "Dark". 
-		
+
 		If not specified then "Medium" is used as the default value .
-		
-	.PARAMETER  ParentProgressId
-		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID			
-		
-	.EXAMPLE
+
+		.PARAMETER  ParentProgressId
+		If the caller is using Write-Progress then all progress information will be written using ParentProgressId as the ParentID
+
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel -SqlServerInventory $Inventory 
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
-		
-	.EXAMPLE
+
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel -SqlServerInventory $Inventory -Path 'C:\DB Engine Inventory.xlsx'
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbook will be written to your C:\DB Engine Inventory.xlsx.
-		
+
 		The Office color theme and Medium color scheme will be used by default.
 
-	.EXAMPLE
+		.EXAMPLE
 		Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel -SqlServerInventory $Inventory -ColorTheme Blue -ColorScheme Dark
-		
+
 		Description
 		-----------
 		Write a Database Engine inventory using the SQL Server Inventory contained in $Inventory.
 
 		The Excel workbook will be written to your "My Documents" folder.
-		
+
 		The Blue color theme and Dark color scheme will be used.
-	
-	.NOTES
+
+		.NOTES
 		Blue and Green are nice looking Color Themes for Office 2013
 
 		Waveform is a nice looking Color Theme for Office 2010
 
-	.LINK
+		.LINK
 		Get-SqlServerInventory
 
-#>
+	#>
 	[cmdletBinding()]
 	param(
 		[Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -11173,30 +11185,30 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 	process {
 
 		<#
-	.LINK
-		"Export Windows PowerShell Data to Excel" (http://technet.microsoft.com/en-us/query/dd297620)
-		
-	.LINK
-		"Microsoft.Office.Interop.Excel Namespace" (http://msdn.microsoft.com/en-us/library/office/microsoft.office.interop.excel(v=office.14).aspx)
-		
-	.LINK
-		"Excel Object Model Reference" (http://msdn.microsoft.com/en-us/library/ff846392.aspx)
-		
-	.LINK
-		"Excel 2010 Enumerations" (http://msdn.microsoft.com/en-us/library/ff838815.aspx)
-		
-	.LINK
-		"TableStyle Cheat Sheet in French/English" (http://msdn.microsoft.com/fr-fr/library/documentformat.openxml.spreadsheet.tablestyle.aspx)
-		
-	.LINK
-		"Color Palette and the 56 Excel ColorIndex Colors" (http://dmcritchie.mvps.org/excel/colors.htm)
-		
-	.LINK
-		"Adding Color to Excel 2007 Worksheets by Using the ColorIndex Property" (http://msdn.microsoft.com/en-us/library/cc296089(v=office.12).aspx)
-		
-	.LINK
-		"XlRgbColor Enumeration" (http://msdn.microsoft.com/en-us/library/ff197459.aspx)
-#>
+			.LINK
+			"Export Windows PowerShell Data to Excel" (http://technet.microsoft.com/en-us/query/dd297620)
+
+			.LINK
+			"Microsoft.Office.Interop.Excel Namespace" (http://msdn.microsoft.com/en-us/library/office/microsoft.office.interop.excel(v=office.14).aspx)
+
+			.LINK
+			"Excel Object Model Reference" (http://msdn.microsoft.com/en-us/library/ff846392.aspx)
+
+			.LINK
+			"Excel 2010 Enumerations" (http://msdn.microsoft.com/en-us/library/ff838815.aspx)
+
+			.LINK
+			"TableStyle Cheat Sheet in French/English" (http://msdn.microsoft.com/fr-fr/library/documentformat.openxml.spreadsheet.tablestyle.aspx)
+
+			.LINK
+			"Color Palette and the 56 Excel ColorIndex Colors" (http://dmcritchie.mvps.org/excel/colors.htm)
+
+			.LINK
+			"Adding Color to Excel 2007 Worksheets by Using the ColorIndex Property" (http://msdn.microsoft.com/en-us/library/cc296089(v=office.12).aspx)
+
+			.LINK
+			"XlRgbColor Enumeration" (http://msdn.microsoft.com/en-us/library/ff197459.aspx)
+		#>
 
 		$Excel = New-Object -Com Excel.Application
 		$Workbook = $null
@@ -11295,7 +11307,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 
 		# Add enough worksheets to get us to $WorksheetCount
-		$Excel.Worksheets.Add($MissingType, $Excel.Worksheets.Item($Excel.Worksheets.Count), $WorksheetCount - $Excel.Worksheets.Count, $Excel.Worksheets.Item(1).Type) | Out-Null
+		$null = $Excel.Worksheets.Add($MissingType, $Excel.Worksheets.Item($Excel.Worksheets.Count), $WorksheetCount - $Excel.Worksheets.Count, $Excel.Worksheets.Item(1).Type)
 		$WorksheetNumber = 1
 
 		try {
@@ -11356,7 +11368,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -11370,7 +11382,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -11427,7 +11439,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.IsClustered
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.ProcessorCount
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.MemoryMB
-				$WorksheetData[$Row,$Col++] = "{0:N2}" -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
+				$WorksheetData[$Row,$Col++] = '{0:N2}' -f ($_.Server.Configuration.General.MemoryInUseKB / 1KB)
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.OperatingSystem.Name
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.ComputerSystemProduct.Manufacturer
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.ComputerSystemProduct.Name
@@ -11437,7 +11449,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			$Range = $Worksheet.Range($Worksheet.Cells.Item(1,1), $Worksheet.Cells.Item($RowCount,$ColumnCount))
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType, $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes)
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
@@ -11454,7 +11466,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 15; NumberFormat = $XlNumFmtNumberS2}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -11510,9 +11522,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					$WorksheetData[$Row,$Col++] = $_.Properties.Options.RecoveryModel
 					$WorksheetData[$Row,$Col++] = ($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object).Count
 					$WorksheetData[$Row,$Col++] = ($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'Log' } | Measure-Object).Count
-					$WorksheetData[$Row,$Col++] = "{0:N2}" -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
-					$WorksheetData[$Row,$Col++] = "{0:N2}" -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'log' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
-					$WorksheetData[$Row,$Col++] = "{0:N2}" -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property AvailableSpaceKB -Sum).Sum / 1KB)
+					$WorksheetData[$Row,$Col++] = '{0:N2}' -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
+					$WorksheetData[$Row,$Col++] = '{0:N2}' -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'log' } | Measure-Object -Property SizeKB -Sum).Sum / 1KB)
+					$WorksheetData[$Row,$Col++] = '{0:N2}' -f (($_.Properties.Files.DatabaseFiles | Where-Object { $_.FileType -ieq 'rows data' } | Measure-Object -Property AvailableSpaceKB -Sum).Sum / 1KB)
 					$WorksheetData[$Row,$Col++] = $_.Properties.General.Database.LastKnownGoodDbccDate
 					$WorksheetData[$Row,$Col++] = $_.Properties.General.Backup.LastFullBackupDate
 					$WorksheetData[$Row,$Col++] = $_.Properties.General.Backup.LastDifferentialBackupDate
@@ -11525,7 +11537,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			$Range.Value2 = $WorksheetData
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $MissingType,S $MissingType, $MissingType, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
 			#$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $MissingType, $MissingType, $XlYesNoGuess::xlYes) | Out-Null
-			$Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes) | Out-Null
+			$null = $Range.Sort($Worksheet.Columns.Item(1), $XlSortOrder::xlAscending, $Worksheet.Columns.Item(2), $MissingType, $XlSortOrder::xlAscending, $Worksheet.Columns.Item(3), $XlSortOrder::xlAscending, $XlYesNoGuess::xlYes)
 
 			$WorksheetFormat.Add($WorksheetNumber, @{
 					BoldFirstRow = $true
@@ -11545,7 +11557,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -11651,7 +11663,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -11712,7 +11724,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -11812,7 +11824,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 21; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -11960,7 +11972,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 27; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12040,7 +12052,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 10; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12122,7 +12134,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12214,7 +12226,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 11; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12307,7 +12319,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 16; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12399,7 +12411,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'I2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12506,7 +12518,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtNumberS3}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12597,7 +12609,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12670,7 +12682,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12735,7 +12747,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12830,7 +12842,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 13; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -12911,7 +12923,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13018,7 +13030,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtNumberS3}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13083,7 +13095,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13180,7 +13192,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13328,7 +13340,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 27; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13421,7 +13433,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 16; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13513,7 +13525,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'I2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13620,7 +13632,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtNumberS3}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13711,7 +13723,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13784,7 +13796,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13865,7 +13877,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -13972,7 +13984,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtNumberS3}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14037,7 +14049,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14112,7 +14124,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 12; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14205,7 +14217,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14305,7 +14317,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 14; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14363,7 +14375,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14430,7 +14442,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14547,7 +14559,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 28; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14695,7 +14707,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 27; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14775,7 +14787,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 10; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14857,7 +14869,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -14964,7 +14976,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtNumberS3}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15055,7 +15067,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15128,7 +15140,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15228,7 +15240,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 14; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15286,7 +15298,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15375,7 +15387,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15433,7 +15445,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'D2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15509,7 +15521,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15599,7 +15611,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 15; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15682,7 +15694,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 10; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15778,7 +15790,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 12; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -15858,7 +15870,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16010,7 +16022,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 27; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16093,7 +16105,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 10; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16178,7 +16190,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16288,7 +16300,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 8; NumberFormat = $XlNumFmtNumberS3}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16382,7 +16394,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 17; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16458,7 +16470,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'F2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16546,7 +16558,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 10; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16611,7 +16623,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16676,7 +16688,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16734,7 +16746,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16806,7 +16818,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16899,7 +16911,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 16; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -16963,7 +16975,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17031,7 +17043,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17122,7 +17134,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 19; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17186,7 +17198,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17254,7 +17266,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 7; NumberFormat = $XlNumFmtDate}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17316,7 +17328,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17382,7 +17394,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 3; NumberFormat = $XlNumFmtNumberGeneral}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17469,7 +17481,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 16; NumberFormat = $XlNumFmtNumberS0}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17537,7 +17549,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtText}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17599,7 +17611,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 					FreezeAtCell = 'E2'
 					ColumnFormat = @()
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17671,7 +17683,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						@{ColumnNumber = 6; NumberFormat = $XlNumFmtText}
 					)
 					RowFormat = @()
-				})
+			})
 
 			$WorksheetNumber++
 			#endregion
@@ -17693,25 +17705,25 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 				$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 
 				# Switch to the worksheet
-				$Worksheet.Activate() | Out-Null
+				$null = $Worksheet.Activate()
 
 				# Bold the header row
 				$Duration = (Measure-Command {
 						$Worksheet.Rows.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstRow
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Bold Header Row Duration (ms): $Duration" -MessageLevel Debug
 
 				# Bold the 1st column
 				$Duration = (Measure-Command {
 						$Worksheet.Columns.Item(1).Font.Bold = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Bold 1st Column Duration (ms): $Duration" -MessageLevel Debug
 
 				# Freeze View
 				$Duration = (Measure-Command {
 						$Worksheet.Range($WorksheetFormat[$WorksheetNumber].FreezeAtCell).Select() | Out-Null
 						$Worksheet.Application.ActiveWindow.FreezePanes = $true 
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Freeze View Duration (ms): $Duration" -MessageLevel Debug
 
 
@@ -17720,7 +17732,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						$WorksheetFormat[$WorksheetNumber].ColumnFormat | ForEach-Object {
 							$Worksheet.Columns.Item($_.ColumnNumber).NumberFormat = $_.NumberFormat
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Column formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Apply Row formatting
@@ -17728,7 +17740,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						$WorksheetFormat[$WorksheetNumber].RowFormat | ForEach-Object {
 							$Worksheet.Rows.Item($_.RowNumber).NumberFormat = $_.NumberFormat
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Row formatting Duration (ms): $Duration" -MessageLevel Verbose
 
 				# Update worksheet values so row and column formatting apply
@@ -17737,7 +17749,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 							$Worksheet.UsedRange.Value2 = $Worksheet.UsedRange.Value2
 						} catch {
 							# Sometimes trying to set the entire worksheet's value to itself will result in the following exception:
-							# 	"Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
+							# "Not enough storage is available to complete this operation. 0x8007000E (E_OUTOFMEMORY))"
 							# See http://support.microsoft.com/kb/313275 for more information
 							# When this happens the workaround is to try doing the work in smaller chunks
 							# ...so we'll try to update the column\row values that have specific formatting one at a time instead of the entire worksheet at once
@@ -17748,7 +17760,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 								$Worksheet.Rows.Item($_.RowNumber).Value2 = $Worksheet.Rows.Item($_.RowNumber).Value2
 							}
 						}
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply Row and Column formatting - Update Values (ms): $Duration" -MessageLevel Debug
 
 
@@ -17759,45 +17771,45 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 						$ListObject.TableStyle = $TableStyle
 						$ListObject.ShowTableStyleFirstColumn = $WorksheetFormat[$WorksheetNumber].BoldFirstColumn # Put a background color behind the 1st column
 						$ListObject.ShowAutoFilter = $WorksheetFormat[$WorksheetNumber].AutoFilter
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Apply table formatting Duration (ms): $Duration" -MessageLevel Debug
 
 				# Zoom back to 80%
 				$Duration = (Measure-Command {
 						$Worksheet.Application.ActiveWindow.Zoom = 80
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Zoom to 80% Duration (ms): $Duration" -MessageLevel Debug
 
 				# Adjust the column widths to 250 before autofitting contents
 				# This allows longer lines of text to remain on one line
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.ColumnWidth = 250
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Change column width Duration (ms): $Duration" -MessageLevel Debug
 
 				# Autofit column and row contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.AutoFit() | Out-Null
 						$Worksheet.UsedRange.EntireRow.AutoFit() | Out-Null
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Autofit contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Left align contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.HorizontalAlignment = $XlHAlign::xlHAlignLeft
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Left align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Vertical align contents
 				$Duration = (Measure-Command {
 						$Worksheet.UsedRange.EntireColumn.VerticalAlignment = $XlVAlign::xlVAlignTop
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Vertical align contents Duration (ms): $Duration" -MessageLevel Debug
 
 				# Put the selection back to the upper left cell
 				$Duration = (Measure-Command {
 						$Worksheet.Range('A1').Select() | Out-Null
-					}).TotalMilliseconds
+				}).TotalMilliseconds
 				Write-SqlServerInventoryLog -Message "Reset selection Duration (ms): $Duration" -MessageLevel Debug
 			}
 
@@ -17883,80 +17895,80 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 }
 
 <#
-Function Names Reserved For Future Consideration:
+	Function Names Reserved For Future Consideration:
 
-Export-SqlServerInventoryWindowsInventoryToExcel
-Export-SqlServerInventoryWindowsMachineToExcel
-Export-SqlServerInventoryWindowsConfigToExcel
-Export-SqlServerInventoryWindowsOperatingSystemToExcel
-Export-SqlServerInventoryWindowsOsToExcel
-Export-SqlServerInventoryWindowsOStoExcel
-Export-SqlServerInventoryWindowsToExcel
+	Export-SqlServerInventoryWindowsInventoryToExcel
+	Export-SqlServerInventoryWindowsMachineToExcel
+	Export-SqlServerInventoryWindowsConfigToExcel
+	Export-SqlServerInventoryWindowsOperatingSystemToExcel
+	Export-SqlServerInventoryWindowsOsToExcel
+	Export-SqlServerInventoryWindowsOStoExcel
+	Export-SqlServerInventoryWindowsToExcel
 
-Export-SqlServerInventoryDbEngineConfigToExcel
-Export-SqlServerInventoryDbEngineDbObjectsToExcel
-Export-SqlServerInventoryDatabaseEngineConfigToExcel
-Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel
+	Export-SqlServerInventoryDbEngineConfigToExcel
+	Export-SqlServerInventoryDbEngineDbObjectsToExcel
+	Export-SqlServerInventoryDatabaseEngineConfigToExcel
+	Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel
 
-Export-SqlInventoryDatabaseEngineConfigToExcel
-Export-SqlInventoryDatabaseEngineDbObjectsToExcel
-Export-SqlInventoryDbEngineConfigToExcel
-Export-SqlInventoryDbEngineDbObjectsToExcel
-Export-SqlInvDatabaseEngineConfigToExcel
-Export-SqlInvDbeEngineConfigToExcel
-Export-SqlInvDbeEngineDbObjectsToExcel
+	Export-SqlInventoryDatabaseEngineConfigToExcel
+	Export-SqlInventoryDatabaseEngineDbObjectsToExcel
+	Export-SqlInventoryDbEngineConfigToExcel
+	Export-SqlInventoryDbEngineDbObjectsToExcel
+	Export-SqlInvDatabaseEngineConfigToExcel
+	Export-SqlInvDbeEngineConfigToExcel
+	Export-SqlInvDbeEngineDbObjectsToExcel
 
 
 
-Get-SqlServerServiceData
-Get-DbEngineOverviewData
-Get-DbEngineServerConfigGeneralData
-Get-DbEngineServerConfigMemoryData
-Get-DbEngineServerConfigProcessorsData
-Get-DbEngineServerConfigSecurityData
-Get-DbEngineServerConfigConnectionsData
-Get-DbEngineServerConfigDatabaseSettingsData
-Get-DbEngineServerConfigAdvancedData
-Get-DbEngineServerConfigClusteringData
-Get-DbEngineServerConfigAlwaysOnData
-Get-DbEngineServerSecurityLoginsData
-Get-DbEngineServerSecurityRolesData
-Get-DbEngineServerSecurityCredentialsData
-Get-DbEngineServerSecurityAuditsData
-Get-DbEngineServerSecurityAuditSpecificationsData
-Get-DbEngineServerObjectsEndpointsData
-Get-DbEngineServerObjectsEndpointsData
-Get-DbEngineServerObjectsLinkedServerConfigurationData
-Get-DbEngineServerObjectsLinkedServerLoginsData
-Get-DbEngineServerObjectsTraceFlagsData
-Get-DbEngineServerObjectsServerTriggersData
-Get-DbEngineServerManagementStartupProceduresData
-Get-DbEngineServerManagementResourceGovernorData
-Get-DbEngineServerManagementDatabaseMailAccountsData
-Get-DbEngineServerManagementDatabaseMailProfilesData
-Get-DbEngineServerManagementDatabaseMailSecurityData
-Get-DbEngineServerManagementDatabaseMailConfigurationData
-Get-DbEngineDatabaseOverviewData
-Get-DbEngineDatabaseConfigGeneralData
-Get-DbEngineDatabaseConfigFilesData
-Get-DbEngineDatabaseConfigFilegroupsData
-Get-DbEngineDatabaseConfigOptionsData
-Get-DbEngineDatabaseConfigAlwaysOnData
-Get-DbEngineDatabaseConfigChangeTrackingData
-Get-DbEngineDatabaseConfigMirroringData
-Get-DbEngineDatabaseSecuritySchemasData
-Get-DbEngineDatabaseSecurityUsersData
-Get-DbEngineDatabaseSecurityDatabaseRolesData
-Get-DbEngineDatabaseSecurityApplicationRolesData
-Get-DbEngineDatabaseSecurityCertificatesData
-Get-DbEngineDatabaseSecurityAsymmetricKeysData
-Get-DbEngineDatabaseSecuritySymmetricKeysData
-Get-AgentConfigData
-Get-AgentJobsData
-Get-AgentJobSchedulesData
-Get-AgentJobStepsData
-Get-AgentJobAlertsData
-Get-AgentJobNotificationsData
-Get-AgentAlertsData
-Get-AgentOperatorsData
+	Get-SqlServerServiceData
+	Get-DbEngineOverviewData
+	Get-DbEngineServerConfigGeneralData
+	Get-DbEngineServerConfigMemoryData
+	Get-DbEngineServerConfigProcessorsData
+	Get-DbEngineServerConfigSecurityData
+	Get-DbEngineServerConfigConnectionsData
+	Get-DbEngineServerConfigDatabaseSettingsData
+	Get-DbEngineServerConfigAdvancedData
+	Get-DbEngineServerConfigClusteringData
+	Get-DbEngineServerConfigAlwaysOnData
+	Get-DbEngineServerSecurityLoginsData
+	Get-DbEngineServerSecurityRolesData
+	Get-DbEngineServerSecurityCredentialsData
+	Get-DbEngineServerSecurityAuditsData
+	Get-DbEngineServerSecurityAuditSpecificationsData
+	Get-DbEngineServerObjectsEndpointsData
+	Get-DbEngineServerObjectsEndpointsData
+	Get-DbEngineServerObjectsLinkedServerConfigurationData
+	Get-DbEngineServerObjectsLinkedServerLoginsData
+	Get-DbEngineServerObjectsTraceFlagsData
+	Get-DbEngineServerObjectsServerTriggersData
+	Get-DbEngineServerManagementStartupProceduresData
+	Get-DbEngineServerManagementResourceGovernorData
+	Get-DbEngineServerManagementDatabaseMailAccountsData
+	Get-DbEngineServerManagementDatabaseMailProfilesData
+	Get-DbEngineServerManagementDatabaseMailSecurityData
+	Get-DbEngineServerManagementDatabaseMailConfigurationData
+	Get-DbEngineDatabaseOverviewData
+	Get-DbEngineDatabaseConfigGeneralData
+	Get-DbEngineDatabaseConfigFilesData
+	Get-DbEngineDatabaseConfigFilegroupsData
+	Get-DbEngineDatabaseConfigOptionsData
+	Get-DbEngineDatabaseConfigAlwaysOnData
+	Get-DbEngineDatabaseConfigChangeTrackingData
+	Get-DbEngineDatabaseConfigMirroringData
+	Get-DbEngineDatabaseSecuritySchemasData
+	Get-DbEngineDatabaseSecurityUsersData
+	Get-DbEngineDatabaseSecurityDatabaseRolesData
+	Get-DbEngineDatabaseSecurityApplicationRolesData
+	Get-DbEngineDatabaseSecurityCertificatesData
+	Get-DbEngineDatabaseSecurityAsymmetricKeysData
+	Get-DbEngineDatabaseSecuritySymmetricKeysData
+	Get-AgentConfigData
+	Get-AgentJobsData
+	Get-AgentJobSchedulesData
+	Get-AgentJobStepsData
+	Get-AgentJobAlertsData
+	Get-AgentJobNotificationsData
+	Get-AgentAlertsData
+	Get-AgentOperatorsData
 #>

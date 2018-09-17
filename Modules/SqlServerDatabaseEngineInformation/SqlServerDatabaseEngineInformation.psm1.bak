@@ -2971,7 +2971,7 @@ function Get-FullTextLanguageValue($Language) {
 			1041 { 'Japanese'}
 			1042 { 'Korean'}
 			1043 { 'Dutch'}
-			1044 { 'Bokmål'}
+			1044 { 'Bokmï¿½l'}
 			1045 { 'Polish'}
 			1046 { 'Brazilian'}
 			1048 { 'Romanian'}
@@ -3214,7 +3214,7 @@ function Get-LanguageValue($Language) {
 			30 { 'Simplified Chinese'}
 			31 { 'Arabic'}
 			32 { 'Thai'}
-			33 { 'Bokmål'} 
+			33 { 'Bokmï¿½l'} 
 			$null {$null}
 			default {'Unknown'} 
 		}

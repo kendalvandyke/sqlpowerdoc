@@ -12,6 +12,7 @@ New-Variable -Name HKEY_DYN_DATA -Value 2147483654 -Scope Script -Option Constan
 
 # Script constants
 New-Variable -Name Version -Value '1.0.0' -Scope Script -Option Constant
+New-Variable -Name RegExGUID -Value '^(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}$' -Scope Script -Option Constant
 
 
 # OS Versions
@@ -29,6 +30,9 @@ New-Object -TypeName System.Version -ArgumentList '6.1' | New-Variable -Name Win
 New-Object -TypeName System.Version -ArgumentList '6.1' | New-Variable -Name Windows7 -Scope Script -Option Constant
 New-Object -TypeName System.Version -ArgumentList '6.2' | New-Variable -Name Windows8 -Scope Script -Option Constant
 New-Object -TypeName System.Version -ArgumentList '6.2' | New-Variable -Name WindowsServer2012 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '6.3' | New-Variable -Name Windows8_1 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '6.3' | New-Variable -Name WindowsServer2012R2 -Scope Script -Option Constant
+New-Object -TypeName System.Version -ArgumentList '10.0' | New-Variable -Name Windows10 -Scope Script -Option Constant
 
 
 
@@ -2820,33 +2824,44 @@ function Get-PatchInformationFromWMI([string]$Computer) {
 	# Using Get-Hotfix instead of Win32_QuickFixEngineering because it takes care of date formatting
 	# Win32_QuickFixEngineering: http://msdn.microsoft.com/en-us/library/aa394391(VS.85).aspx
 
-	$PatchInformation = @()
-	$Patch = $null
+	# Don't include patches that are a GUID
+    # Use some grouping magic to return a merged & unique list of fixes
+	$PatchInformation =  @() + (
+        Get-HotFix -ComputerName $Computer |
+        Where-Object { $_.HotFixID -inotmatch '^(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}$' } | 
+        Select-Object -Property HotFixId,
+            @{ Name='Caption'; Expression={ if ([String]::IsNullOrEmpty($_.Caption)) { 'http://support.microsoft.com/kb/{0}' -f [RegEx]::Match($_.HotFixId,'(?<=KB)?\d+').Value } else { $_.Caption } }},
+            Description,
+            FixComments,
+            InstalledBy,
+            @{ Name='InstallDateUTC'; Expression={
+                if ((-not [String]::IsNullOrEmpty($_.psbase.Properties['InstalledOn'].Value)) -and ($_.InstalledOn -ne $null)) {
+                    $_.InstalledOn.ToUniversalTime()
+                } else {
+                    $null
+                }
+            }} |
+        Group-Object -Property HotFixID |
+        Select-Object -Property @{ Name='HotFixId'; Expression={$_.Name}},
+            @{ Name='Caption'; Expression={($_.Group | Where-Object { -not [String]::IsNullOrEmpty($_.Caption) } | Select-Object -ExpandProperty Caption -Unique) -join ';'}},
+            @{ Name='Description'; Expression={($_.Group | Where-Object { -not [String]::IsNullOrEmpty($_.Description) } | Select-Object -ExpandProperty Description -Unique) -join ';'}},
+            @{ Name='Type'; Expression={($_.Group | Where-Object { -not [String]::IsNullOrEmpty($_.FixComments) } | Select-Object -ExpandProperty FixComments -Unique) -join ';'}},
+            @{ Name='InstalledBy'; Expression={($_.Group | Where-Object { -not [String]::IsNullOrEmpty($_.InstalledBy) } | Select-Object -ExpandProperty InstalledBy -Unique) -join ';'}},
+            @{ Name='InstallDateUTC'; Expression={($_.Group | Where-Object { -not [String]::IsNullOrEmpty($_.InstallDateUTC) } | Select-Object -ExpandProperty InstallDateUTC -Unique) -join ';'}}
+    )
 
-	$HotFix = Get-HotFix -ComputerName $Computer
-
-	# Don't include patches that look like {ABC0D0F6-019E-4AC3-AD46-9C044E7B19F3}
-	$HotFix | Where-Object { (-not (($_.HotFixID.Length -eq 38) -and ($_.HotFixID.StartsWith('{')) -and ($_.HotFixID.EndsWith('}')))) } | ForEach-Object {
-
-		$Patch = New-Object -TypeName psobject -Property @{
-			Caption = $_.Caption
-			Description = $_.Description
-			HotFixID = $_.HotFixID
-			InstalledBy = $_.InstalledBy
-			InstallDateUTC = if (($_.psbase.Properties['InstalledOn'].Value -ne [String]::Empty) -and ($_.InstalledOn -ne $null)) { $_.InstalledOn.ToUniversalTime() } else { $null }
-		}
-
-		$PatchInformation += $Patch
-
+    $PatchInformation | 
+    ForEach-Object {
 		Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`tPatch:"
-		$Patch.psobject.Properties | ForEach-Object {
+		$_.psobject.Properties | ForEach-Object {
 			Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`t`t$($_.Name): $($_.Value)"
 		}
+        
+    }
 
-	} 
 	Write-Output $PatchInformation
 
-	Remove-Variable -Name PatchInformation, Patch, HotFix
+	Remove-Variable -Name PatchInformation
 }
 
 function Get-UserAccountInformation([string]$Computer, [System.Version]$OSVersion) {
@@ -3315,74 +3330,89 @@ function Get-ApplicationInformationFromRegistry($RegistryProvider) {
 
 	$ApplicationInformation = @()
 	$Application = $null
-	$RegItemCollection = $null
 	$IncludeProgram = $false
 	$DisplayName = $null
 	$InstallDate = $null
+    $RegKeyUninstall = $null
+    $RegKeyUninstallApplication = $null
 
-	$RegItemCollection = $RegistryProvider.EnumKey($HKEY_LOCAL_MACHINE,'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+    @(
+        'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+        'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+    ) | ForEach-Object {
 
-	$RegItemCollection.sNames | Where-Object { (($_.Length -ne 38) -or (($_.Length -eq 38) -and (-not $_.StartsWith('{')))) } | ForEach-Object {
+        $RegKeyUninstall = $_
 
-		$IncludeProgram = $true
+	    ($RegistryProvider.EnumKey($HKEY_LOCAL_MACHINE,$RegKeyUninstall)).sNames | 
+        Where-Object { 
+            (
+                ($_.Length -ne 38) -or 
+                (($_.Length -eq 38) -and (-not $_.StartsWith('{')))
+            ) 
+        } | 
+        ForEach-Object {
 
-		$DisplayName = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'DisplayName')).sValue
+		    $IncludeProgram = $true
+            $RegKeyUninstallApplication = '{0}\{1}' -f $RegKeyUninstall, $_
 
-		# Only include the program if it's got a display name
-		if (-not $DisplayName) {
+		    $DisplayName = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'DisplayName')).sValue
 
-			$DisplayName = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'HiddenDisplayName')).sValue
+		    # Only include the program if it's got a display name
+		    if (-not $DisplayName) {
 
-			if (-not $DisplayName) {
-				$IncludeProgram = $false
-			}
-		}
+			    $DisplayName = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'HiddenDisplayName')).sValue
+
+			    if (-not $DisplayName) {
+				    $IncludeProgram = $false
+			    }
+		    }
 
 
-		# If it's not an MSI app and has a displayable name then include it
-		if ($IncludeProgram -eq $true) {
+		    # If it's not an MSI app and has a displayable name then include it
+		    if ($IncludeProgram -eq $true) {
 
-			$Application = New-Object -TypeName psobject -Property @{
-				ProductName = $DisplayName
-				Vendor = $null
-				Version = $null
-				InstallDateUTC = $null
-				InstallLocation = $null
-				HelpURL = $null
-				SupportURL = $null
-				UpdateInfoURL = $null
-				Source = 'Registry'
-			}
+			    $Application = New-Object -TypeName psobject -Property @{
+				    ProductName = $DisplayName
+				    Vendor = $null
+				    Version = $null
+				    InstallDateUTC = $null
+				    InstallLocation = $null
+				    HelpURL = $null
+				    SupportURL = $null
+				    UpdateInfoURL = $null
+				    Source = 'Registry'
+			    }
 
-			$Application.Vendor = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'Publisher')).sValue
-			$Application.Version = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'DisplayVersion')).sValue
-			$Application.InstallLocation = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'InstallLocation')).sValue
-			$Application.HelpURL = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'HelpLink')).sValue
-			$Application.SupportURL = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'URLInfoAbout')).sValue
-			$Application.UpdateInfoURL = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'URLUpdateInfo')).sValue
+			    $Application.Vendor = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'Publisher')).sValue
+			    $Application.Version = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'DisplayVersion')).sValue
+			    $Application.InstallLocation = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'InstallLocation')).sValue
+			    $Application.HelpURL = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'HelpLink')).sValue
+			    $Application.SupportURL = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'URLInfoAbout')).sValue
+			    $Application.UpdateInfoURL = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'URLUpdateInfo')).sValue
 
-			$InstallDate = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'InstallDate')).sValue
-			if ($InstallDate -and 
-				$InstallDate.Length -eq 8 -and
-				$InstallDate -imatch '^\d{8}$'
-			) {
-				# If populated the format should be YYYYMMDD
-				$Application.InstallDateUTC = $(Get-Date -Year $($InstallDate).Substring(0,4) -Month $($InstallDate).Substring(4,2) -Day $($InstallDate).Substring(6,2) -Hour 0 -Minute 0 -Second 0 )
-			}
+			    $InstallDate = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'InstallDate')).sValue
+			    if ($InstallDate -and 
+				    $InstallDate.Length -eq 8 -and
+				    $InstallDate -imatch '^\d{8}$'
+			    ) {
+				    # If populated the format should be YYYYMMDD
+				    $Application.InstallDateUTC = $(Get-Date -Year $($InstallDate).Substring(0,4) -Month $($InstallDate).Substring(4,2) -Day $($InstallDate).Substring(6,2) -Hour 0 -Minute 0 -Second 0 )
+			    }
 
-			$ApplicationInformation += $Application
+			    $ApplicationInformation += $Application
 
-			Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`tInstalled Application:"
-			$Application.psobject.Properties | ForEach-Object {
-				Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`t`t$($_.Name): $($_.Value)"
-			} 
-		}
+			    Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`tInstalled Application:"
+			    $Application.psobject.Properties | ForEach-Object {
+				    Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`t`t$($_.Name): $($_.Value)"
+			    } 
+		    }
 
-	}
+	    }
+    }
 
 	Write-Output $ApplicationInformation
 
-	Remove-Variable -Name ApplicationInformation, Application, RegItemCollection, IncludeProgram, DisplayName, InstallDate
+	Remove-Variable -Name ApplicationInformation, Application, IncludeProgram, DisplayName, InstallDate, RegKeyUninstall, RegKeyUninstallApplication
 
 }
 
@@ -3443,43 +3473,70 @@ function Get-PatchInformationFromRegistry($RegistryProvider) {
 
 	$PatchInformation = @()
 	$Patch = $null
-	$RegItemCollection = $null
 	$InstallDate = $null
+    $RegKeyUninstall = $null
+    $RegKeyUninstallApplication = $null
 
-	$RegItemCollection = $RegistryProvider.EnumKey($HKEY_LOCAL_MACHINE,'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+    $PatchInformation += (
+        @(
+            'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+            'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+        ) | ForEach-Object {
 
-	$RegItemCollection.sNames | Where-Object { ($_ -imatch '^(KB)?\d+$') } | ForEach-Object {
+            $RegKeyUninstall = $_
 
-		$Patch = New-Object -TypeName psobject -Property @{
-			Caption = $null
-			Description = $null
-			HotFixID = $_
-			InstalledBy = $null
-			InstallDateUTC = $null
-		}
+            # Some registry keys have a GUID in the front, e.g. {CE2CDD62-0124-36CA-84D3-9F4DCF5C5BD9}.KB958484
+            # Others just begin with KB, e.g. KB958484
+            # Some are just digits only
+	        ($RegistryProvider.EnumKey($HKEY_LOCAL_MACHINE,$RegKeyUninstall)).sNames | 
+            Where-Object { 
+                ($_ -imatch '^((\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\})\.)?(KB)?\d+$')
+            } |
+            ForEach-Object {
 
-		$Patch.Caption = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'HelpLink')).sValue
-		$Patch.Description = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'ReleaseType')).sValue
+                $RegKeyUninstallApplication = '{0}\{1}' -f $RegKeyUninstall, $_
 
-		$InstallDate = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($_)",'InstallDate')).sValue
+		        $Patch = New-Object -TypeName psobject -Property @{
+                    HotFixID = ([RegEx]::Match($_, '(^(KB)?\d+\w+)|((KB)?\d+\w+$)')).Value
+			        Caption = $null
+			        Description = $null
+                    Type = $null			        
+			        InstalledBy = $null
+			        InstallDateUTC = $null
+		        }
 
-		if (($InstallDate) -and ($InstallDate.Length -eq 8)) {
-			# If populated the format should be YYYYMMDD
-			$Patch.InstallDateUTC = $(Get-Date -Year $($InstallDate).Substring(0,4) -Month $($InstallDate).Substring(4,2) -Day $($InstallDate).Substring(6,2) -Hour 0 -Minute 0 -Second 0 ).ToUniversalTime()
-		}
+		        $Patch.Description = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'DisplayName')).sValue
 
-		$PatchInformation += $Patch
+                # Only continue if there's a value for DisplayName
+                if (-not [String]::IsNullOrEmpty($Patch.Description)) {
 
-		Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`tPatch:"
-		$Patch.psobject.Properties | ForEach-Object {
-			Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`t`t$($_.Name): $($_.Value)"
-		} 
+		            $Patch.Caption = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'HelpLink')).sValue
+                    if ([String]::IsNullOrEmpty($Patch.Caption)) {
+                        $Patch.Caption = 'http://support.microsoft.com/kb/{0}' -f [RegEx]::Match($Patch.HotFixId,'(?<=KB)?\d+').Value
+                    }            
 
-	}
+		            $Patch.Type = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'ReleaseType')).sValue
+
+		            $InstallDate = $($RegistryProvider.GetStringValue($HKEY_LOCAL_MACHINE,$RegKeyUninstallApplication,'InstallDate')).sValue
+		            if ((-not [String]::IsNullOrEmpty($InstallDate)) -and ($InstallDate.Length -eq 8)) {
+			            # If populated the format should be YYYYMMDD
+			            $Patch.InstallDateUTC = $(Get-Date -Year $($InstallDate).Substring(0,4) -Month $($InstallDate).Substring(4,2) -Day $($InstallDate).Substring(6,2) -Hour 0 -Minute 0 -Second 0 ).ToUniversalTime()
+		            }
+
+                    Write-Output $Patch
+
+	                Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`tPatch:"
+	                $Patch.psobject.Properties | ForEach-Object {
+		                Write-WindowsMachineInformationLog -MessageLevel Debug -Message "`t`t$($_.Name): $($_.Value)"
+	                }
+                }
+            }
+        }
+    )
 
 	Write-Output $PatchInformation
 
-	Remove-Variable -Name PatchInformation, Patch, RegItemCollection, InstallDate
+	Remove-Variable -Name PatchInformation, Patch, InstallDate, RegKeyUninstall, RegKeyUninstallApplication
 
 }
 
