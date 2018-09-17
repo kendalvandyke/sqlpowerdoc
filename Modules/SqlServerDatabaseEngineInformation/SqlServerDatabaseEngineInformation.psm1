@@ -1930,17 +1930,17 @@ function Get-AgentActivationOrderValue($ActivationOrder) {
 	} else { 
 		Write-Output $(
 			switch ($ActivationOrder) {
-				$ActivationOrderEnum::First {'First'}
-				$ActivationOrderEnum::None {'None'}
-				$ActivationOrderEnum::Last {'Last'}
+				$($ActivationOrderEnum::First) {'First'}
+				$($ActivationOrderEnum::None) {'None'}
+				$($ActivationOrderEnum::Last) {'Last'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$ActivationOrderEnum::First).value__ {'First'}
-				(					$ActivationOrderEnum::None).value__ {'None'}
-				(					$ActivationOrderEnum::Last).value__ {'Last'}
+				$( $ActivationOrderEnum::First).value__ {'First'}
+				$( $ActivationOrderEnum::None).value__ {'None'}
+				$( $ActivationOrderEnum::Last).value__ {'Last'}
 
 				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -1956,12 +1956,12 @@ function Get-AgentCompletionActionValue($CompletionAction) {
 	} else {
 		Write-Output $(
 			switch ($CompletionAction) {
-				$CompletionActionEnum::Never {'Never'}
-				$CompletionActionEnum::OnSuccess {'When the job succeeds'}
-				$CompletionActionEnum::OnFailure {'When the job fails'}
-				$CompletionActionEnum::Always {'Whenever the job completes'}
+				$($CompletionActionEnum::Never) {'Never'}
+				$($CompletionActionEnum::OnSuccess) {'When the job succeeds'}
+				$($CompletionActionEnum::OnFailure) {'When the job fails'}
+				$($CompletionActionEnum::Always) {'Whenever the job completes'}
 				$null {$null} #$null {[String]$null}
-				default { 'Unknown' } 
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -1977,14 +1977,14 @@ function Get-AgentCompletionResultValue($CompletionResult) {
 	} else {
 		Write-Output $(
 			switch ($CompletionResult) {
-				$CompletionResultEnum::Failed {'Failed'}
-				$CompletionResultEnum::Succeeded {'Succeeded'}
-				$CompletionResultEnum::Retry {'Retrying'}
-				$CompletionResultEnum::Cancelled {'Cancelled'}
-				$CompletionResultEnum::InProgress {'In Progress'}
-				$CompletionResultEnum::Unknown {'Unknown'}
+				$($CompletionResultEnum::Failed) {'Failed'}
+				$($CompletionResultEnum::Succeeded) {'Succeeded'}
+				$($CompletionResultEnum::Retry) {'Retrying'}
+				$($CompletionResultEnum::Cancelled) {'Cancelled'}
+				$($CompletionResultEnum::InProgress) {'In Progress'}
+				$($CompletionResultEnum::Unknown) {'Unknown'}
 				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2011,10 +2011,10 @@ function Get-AgentMailTypeValue($AgentMailType) {
 	} else {
 		Write-Output $(
 			switch ($AgentMailType) {
-				$AgentMailTypeEnum::SqlAgentMail {'Agent Mail'}
-				$AgentMailTypeEnum::DatabaseMail {'Database Mail'}
+				$($AgentMailTypeEnum::SqlAgentMail) {'Agent Mail'}
+				$($AgentMailTypeEnum::DatabaseMail) {'Database Mail'}
 				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2030,12 +2030,12 @@ function Get-AgentStepCompletionActionValue($StepCompletionAction) {
 	} else {
 		Write-Output $(
 			switch ($StepCompletionAction) {
-				$StepCompletionActionEnum::QuitWithSuccess {'Quit the job reporting succces'}
-				$StepCompletionActionEnum::QuitWithFailure {'Quit the job reporting failure'}
-				$StepCompletionActionEnum::GoToNextStep {'Go to the next step'}
-				$StepCompletionActionEnum::GoToStep {'Go to step'}
+				$($StepCompletionActionEnum::QuitWithSuccess) {'Quit the job reporting succces'}
+				$($StepCompletionActionEnum::QuitWithFailure) {'Quit the job reporting failure'}
+				$($StepCompletionActionEnum::GoToNextStep) {'Go to the next step'}
+				$($StepCompletionActionEnum::GoToStep) {'Go to step'}
 				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2051,20 +2051,20 @@ function Get-AgentSubSystemValue($AgentSubSystem) {
 	} else {
 		Write-Output $(
 			switch ($AgentSubSystem) {
-				$AgentSubSystemEnum::TransactSql {'Transact-SQL script (T-SQL)'}
-				$AgentSubSystemEnum::ActiveScripting {'ActiveX Script'}
-				$AgentSubSystemEnum::CmdExec {'Operating System (CmdExec)'}
-				$AgentSubSystemEnum::Snapshot {'Replication Snapshot'}
-				$AgentSubSystemEnum::LogReader {'Replication Transaction-Log Reader'}
-				$AgentSubSystemEnum::Distribution {'Replication Distributor'}
-				$AgentSubSystemEnum::Merge {'Replication Merge'}
-				$AgentSubSystemEnum::QueueReader {'Replication Queue Reader'}
-				$AgentSubSystemEnum::AnalysisQuery {'SQL Server Analysis Services Query'}
-				$AgentSubSystemEnum::AnalysisCommand {'SQL Server Analysis Services Command'}
-				$AgentSubSystemEnum::Ssis {'SQL Server Integration Services Package'}
-				$AgentSubSystemEnum::PowerShell {'PowerShell'}
+				$($AgentSubSystemEnum::TransactSql) {'Transact-SQL script (T-SQL)'}
+				$($AgentSubSystemEnum::ActiveScripting) {'ActiveX Script'}
+				$($AgentSubSystemEnum::CmdExec) {'Operating System (CmdExec)'}
+				$($AgentSubSystemEnum::Snapshot) {'Replication Snapshot'}
+				$($AgentSubSystemEnum::LogReader) {'Replication Transaction-Log Reader'}
+				$($AgentSubSystemEnum::Distribution) {'Replication Distributor'}
+				$($AgentSubSystemEnum::Merge) {'Replication Merge'}
+				$($AgentSubSystemEnum::QueueReader) {'Replication Queue Reader'}
+				$($AgentSubSystemEnum::AnalysisQuery) {'SQL Server Analysis Services Query'}
+				$($AgentSubSystemEnum::AnalysisCommand) {'SQL Server Analysis Services Command'}
+				$($AgentSubSystemEnum::Ssis) {'SQL Server Integration Services Package'}
+				$($AgentSubSystemEnum::PowerShell) {'PowerShell'}
 				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2091,12 +2091,12 @@ function Get-AlertTypeValue($AlertType) {
 	} else {
 		Write-Output $(
 			switch ($AlertType) {
-				$AlertTypeEnum::SqlServerEvent {'SQL Server event'}
-				$AlertTypeEnum::SqlServerPerformanceCondition {'SQL Server performance condition'}
-				$AlertTypeEnum::NonSqlServerEvent {'Non-SQL Server event'}
-				$AlertTypeEnum::WmiEvent {'WMI event'}
-				$null { 'NULL' }
-				default {'Unknown'} 
+				$($AlertTypeEnum::SqlServerEvent) {'SQL Server event'}
+				$($AlertTypeEnum::SqlServerPerformanceCondition) {'SQL Server performance condition'}
+				$($AlertTypeEnum::NonSqlServerEvent) {'Non-SQL Server event'}
+				$($AlertTypeEnum::WmiEvent) {'WMI event'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2112,11 +2112,11 @@ function Get-AssemblySecurityLevelValue($AssemblySecurityLevel) {
 	} else {
 		Write-Output $(
 			switch ($AlertType) {
-				$AssemblySecurityLevelEnum::Safe {'Safe'}
-				$AssemblySecurityLevelEnum::External {'External'}
-				$AssemblySecurityLevelEnum::Unrestricted {'Unrestricted'}
-				$null { 'NULL' }
-				default {'Unknown'} 
+				$($AssemblySecurityLevelEnum::Safe) {'Safe'}
+				$($AssemblySecurityLevelEnum::External) {'External'}
+				$($AssemblySecurityLevelEnum::Unrestricted) {'Unrestricted'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2132,12 +2132,12 @@ function Get-AsymmetricKeyEncryptionAlgorithmValue($AsymmetricKeyEncryptionAlgor
 	} else {
 		Write-Output $(
 			switch ($AsymmetricKeyEncryptionAlgorithm) {
-				$AsymmetricKeyEncryptionAlgorithmEnum::CryptographicProviderDefined {'Cryptographic Provider'}
-				$AsymmetricKeyEncryptionAlgorithmEnum::Rsa512 {'512-bit RSA encryption algorithm'}
-				$AsymmetricKeyEncryptionAlgorithmEnum::Rsa1024 {'1024-bit RSA encryption algorithm'}
-				$AsymmetricKeyEncryptionAlgorithmEnum::Rsa2048 {'2048-bit RSA encryption algorithm'}
-				$null { 'NULL' }
-				default {'Unknown'} 
+				$($AsymmetricKeyEncryptionAlgorithmEnum::CryptographicProviderDefined) {'Cryptographic Provider'}
+				$($AsymmetricKeyEncryptionAlgorithmEnum::Rsa512) {'512-bit RSA encryption algorithm'}
+				$($AsymmetricKeyEncryptionAlgorithmEnum::Rsa1024) {'1024-bit RSA encryption algorithm'}
+				$($AsymmetricKeyEncryptionAlgorithmEnum::Rsa2048) {'2048-bit RSA encryption algorithm'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2155,56 +2155,56 @@ function Get-AuditActionTypeValue($AuditActionType) {
 	} else {
 		Write-Output $(
 			switch ($AuditActionType) {
-				$AuditActionTypeEnum::ApplicationRoleChangePasswordGroup {'APPLICATION_ROLE_CHANGE_PASSWORD_GROUP'}
-				$AuditActionTypeEnum::AuditChangeGroup {'AUDIT_CHANGE_GROUP'}
-				$AuditActionTypeEnum::BackupRestoreGroup {'BACKUP_RESTORE_GROUP'}
-				$AuditActionTypeEnum::BrokerLoginGroup {'BROKER_LOGIN_GROUP'}
-				$AuditActionTypeEnum::DatabaseChangeGroup {'DATABASE_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DatabaseLogoutGroup {'DATABASE_LOGOUT_GROUP'}
-				$AuditActionTypeEnum::DatabaseMirroringLoginGroup {'DATABASE_MIRRORING_LOGIN_GROUP'}
-				$AuditActionTypeEnum::DatabaseObjectAccessGroup {'DATABASE_OBJECT_ACCESS_GROUP'}
-				$AuditActionTypeEnum::DatabaseObjectChangeGroup {'DATABASE_OBJECT_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DatabaseObjectOwnershipChangeGroup {'DATABASE_OBJECT_OWNERSHIP_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DatabaseObjectPermissionChangeGroup {'DATABASE_OBJECT_PERMISSION_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DatabaseOperationGroup {'DATABASE_OPERATION_GROUP'}
-				$AuditActionTypeEnum::DatabaseOwnershipChangeGroup {'DATABASE_OWNERSHIP_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DatabasePermissionChangeGroup {'DATABASE_PERMISSION_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DatabasePrincipalChangeGroup {'DATABASE_PRINCIPAL_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DatabasePrincipalImpersonationGroup {'DATABASE_PRINCIPAL_IMPERSONATION_GROUP'}
-				$AuditActionTypeEnum::DatabaseRoleMemberChangeGroup {'DATABASE_ROLE_MEMBER_CHANGE_GROUP'}
-				$AuditActionTypeEnum::DbccGroup {'DBCC_GROUP'}
-				$AuditActionTypeEnum::Delete {'DELETE'}
-				$AuditActionTypeEnum::Execute {'EXECUTE'}
-				$AuditActionTypeEnum::FailedDatabaseAuthenticationGroup {'FAILED_DATABASE_AUTHENTICATION_GROUP'}
-				$AuditActionTypeEnum::FailedLoginGroup {'FAILED_LOGIN_GROUP'}
-				$AuditActionTypeEnum::FullTextGroup {'FULLTEXT_GROUP'}
-				$AuditActionTypeEnum::Insert {'INSERT'}
-				$AuditActionTypeEnum::LoginChangePasswordGroup {'LOGIN_CHANGE_PASSWORD_GROUP'}
-				$AuditActionTypeEnum::LogoutGroup {'LOGOUT_GROUP'}
-				$AuditActionTypeEnum::Receive {'RECEIVE'}
-				$AuditActionTypeEnum::References {'REFERENCES'}
-				$AuditActionTypeEnum::SchemaObjectAccessGroup {'SCHEMA_OBJECT_ACCESS_GROUP'}
-				$AuditActionTypeEnum::SchemaObjectChangeGroup {'SCHEMA_OBJECT_CHANGE_GROUP'}
-				$AuditActionTypeEnum::SchemaObjectOwnershipChangeGroup {'SCHEMA_OBJECT_OWNERSHIP_CHANGE_GROUP'}
-				$AuditActionTypeEnum::SchemaObjectPermissionChangeGroup {'SCHEMA_OBJECT_PERMISSION_CHANGE_GROUP'}
-				$AuditActionTypeEnum::Select {'SELECT'}
-				$AuditActionTypeEnum::ServerObjectChangeGroup {'SERVER_OBJECT_CHANGE_GROUP'}
-				$AuditActionTypeEnum::ServerObjectOwnershipChangeGroup {'SERVER_OBJECT_OWNERSHIP_CHANGE_GROUP'}
-				$AuditActionTypeEnum::ServerObjectPermissionChangeGroup {'SERVER_OBJECT_PERMISSION_CHANGE_GROUP'}
-				$AuditActionTypeEnum::ServerOperationGroup {'SERVER_OPERATION_GROUP'}
-				$AuditActionTypeEnum::ServerPermissionChangeGroup {'SERVER_PERMISSION_CHANGE_GROUP'}
-				$AuditActionTypeEnum::ServerPrincipalChangeGroup {'SERVER_PRINCIPAL_CHANGE_GROUP'}
-				$AuditActionTypeEnum::ServerPrincipalImpersonationGroup {'SERVER_PRINCIPAL_IMPERSONATION_GROUP'}
-				$AuditActionTypeEnum::ServerRoleMemberChangeGroup {'SERVER_ROLE_MEMBER_CHANGE_GROUP'}
-				$AuditActionTypeEnum::ServerStateChangeGroup {'SERVER_STATE_CHANGE_GROUP'}
-				$AuditActionTypeEnum::SuccessfulDatabaseAuthenticationGroup {'SUCCESSFUL_DATABASE_AUTHENTICATION_GROUP'}
-				$AuditActionTypeEnum::SuccessfulLoginGroup {'SUCCESSFUL_LOGIN_GROUP'}
-				$AuditActionTypeEnum::TraceChangeGroup {'TRACE_CHANGE_GROUP'}
-				$AuditActionTypeEnum::Update {'UPDATE'}
-				$AuditActionTypeEnum::UserChangePasswordGroup {'USER_CHANGE_PASSWORD_GROUP'}
-				$AuditActionTypeEnum::UserDefinedAuditGroup {'USER_DEFINED_AUDIT_GROUP'}
-				$null { 'NULL' }
-				default {'Unknown'}
+				$($AuditActionTypeEnum::ApplicationRoleChangePasswordGroup) {'APPLICATION_ROLE_CHANGE_PASSWORD_GROUP'}
+				$($AuditActionTypeEnum::AuditChangeGroup) {'AUDIT_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::BackupRestoreGroup) {'BACKUP_RESTORE_GROUP'}
+				$($AuditActionTypeEnum::BrokerLoginGroup) {'BROKER_LOGIN_GROUP'}
+				$($AuditActionTypeEnum::DatabaseChangeGroup) {'DATABASE_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DatabaseLogoutGroup) {'DATABASE_LOGOUT_GROUP'}
+				$($AuditActionTypeEnum::DatabaseMirroringLoginGroup) {'DATABASE_MIRRORING_LOGIN_GROUP'}
+				$($AuditActionTypeEnum::DatabaseObjectAccessGroup) {'DATABASE_OBJECT_ACCESS_GROUP'}
+				$($AuditActionTypeEnum::DatabaseObjectChangeGroup) {'DATABASE_OBJECT_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DatabaseObjectOwnershipChangeGroup) {'DATABASE_OBJECT_OWNERSHIP_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DatabaseObjectPermissionChangeGroup) {'DATABASE_OBJECT_PERMISSION_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DatabaseOperationGroup) {'DATABASE_OPERATION_GROUP'}
+				$($AuditActionTypeEnum::DatabaseOwnershipChangeGroup) {'DATABASE_OWNERSHIP_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DatabasePermissionChangeGroup) {'DATABASE_PERMISSION_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DatabasePrincipalChangeGroup) {'DATABASE_PRINCIPAL_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DatabasePrincipalImpersonationGroup) {'DATABASE_PRINCIPAL_IMPERSONATION_GROUP'}
+				$($AuditActionTypeEnum::DatabaseRoleMemberChangeGroup) {'DATABASE_ROLE_MEMBER_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::DbccGroup) {'DBCC_GROUP'}
+				$($AuditActionTypeEnum::Delete) {'DELETE'}
+				$($AuditActionTypeEnum::Execute) {'EXECUTE'}
+				$($AuditActionTypeEnum::FailedDatabaseAuthenticationGroup) {'FAILED_DATABASE_AUTHENTICATION_GROUP'}
+				$($AuditActionTypeEnum::FailedLoginGroup) {'FAILED_LOGIN_GROUP'}
+				$($AuditActionTypeEnum::FullTextGroup) {'FULLTEXT_GROUP'}
+				$($AuditActionTypeEnum::Insert) {'INSERT'}
+				$($AuditActionTypeEnum::LoginChangePasswordGroup) {'LOGIN_CHANGE_PASSWORD_GROUP'}
+				$($AuditActionTypeEnum::LogoutGroup) {'LOGOUT_GROUP'}
+				$($AuditActionTypeEnum::Receive) {'RECEIVE'}
+				$($AuditActionTypeEnum::References) {'REFERENCES'}
+				$($AuditActionTypeEnum::SchemaObjectAccessGroup) {'SCHEMA_OBJECT_ACCESS_GROUP'}
+				$($AuditActionTypeEnum::SchemaObjectChangeGroup) {'SCHEMA_OBJECT_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::SchemaObjectOwnershipChangeGroup) {'SCHEMA_OBJECT_OWNERSHIP_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::SchemaObjectPermissionChangeGroup) {'SCHEMA_OBJECT_PERMISSION_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::Select) {'SELECT'}
+				$($AuditActionTypeEnum::ServerObjectChangeGroup) {'SERVER_OBJECT_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::ServerObjectOwnershipChangeGroup) {'SERVER_OBJECT_OWNERSHIP_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::ServerObjectPermissionChangeGroup) {'SERVER_OBJECT_PERMISSION_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::ServerOperationGroup) {'SERVER_OPERATION_GROUP'}
+				$($AuditActionTypeEnum::ServerPermissionChangeGroup) {'SERVER_PERMISSION_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::ServerPrincipalChangeGroup) {'SERVER_PRINCIPAL_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::ServerPrincipalImpersonationGroup) {'SERVER_PRINCIPAL_IMPERSONATION_GROUP'}
+				$($AuditActionTypeEnum::ServerRoleMemberChangeGroup) {'SERVER_ROLE_MEMBER_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::ServerStateChangeGroup) {'SERVER_STATE_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::SuccessfulDatabaseAuthenticationGroup) {'SUCCESSFUL_DATABASE_AUTHENTICATION_GROUP'}
+				$($AuditActionTypeEnum::SuccessfulLoginGroup) {'SUCCESSFUL_LOGIN_GROUP'}
+				$($AuditActionTypeEnum::TraceChangeGroup) {'TRACE_CHANGE_GROUP'}
+				$($AuditActionTypeEnum::Update) {'UPDATE'}
+				$($AuditActionTypeEnum::UserChangePasswordGroup) {'USER_CHANGE_PASSWORD_GROUP'}
+				$($AuditActionTypeEnum::UserDefinedAuditGroup) {'USER_DEFINED_AUDIT_GROUP'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2220,11 +2220,11 @@ function Get-AuditDestinationTypeValue($AuditDestinationType) {
 	} else {
 		Write-Output $(
 			switch ($AuditDestinationType) {
-				$AuditDestinationTypeEnum::File {'File'}
-				$AuditDestinationTypeEnum::SecurityLog {'Security Log'}
-				$AuditDestinationTypeEnum::ApplicationLog {'Application Log'}
-				$null { 'NULL' }
-				default {'Unknown'}
+				$($AuditDestinationTypeEnum::File) {'File'}
+				$($AuditDestinationTypeEnum::SecurityLog) {'Security Log'}
+				$($AuditDestinationTypeEnum::ApplicationLog) {'Application Log'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2240,11 +2240,11 @@ function Get-AuditFileSizeUnitValue($AuditFileSizeUnit) {
 	} else {
 		Write-Output $(
 			switch ($AuditFileSizeUnit) {
-				$AuditFileSizeUnitEnum::Mb {'MB'}
-				$AuditFileSizeUnitEnum::Gb {'GB'}
-				$AuditFileSizeUnitEnum::Tb {'TB'}
-				$null { 'NULL' }
-				default {'Unknown'}
+				$($AuditFileSizeUnitEnum::Mb) {'MB'}
+				$($AuditFileSizeUnitEnum::Gb) {'GB'}
+				$($AuditFileSizeUnitEnum::Tb) {'TB'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2262,12 +2262,12 @@ function Get-AuditLevelValue($AuditLevel) {
 	} else {
 		Write-Output $(
 			switch ($AuditLevel) {
-				$AuditLevelEnum::None {'None'}
-				$AuditLevelEnum::Success {'Successful logins only'}
-				$AuditLevelEnum::Failure {'Failed logins only'}
-				$AuditLevelEnum::All {'Both failed and successful logins'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($AuditLevelEnum::None) {'None'}
+				$($AuditLevelEnum::Success) {'Successful logins only'}
+				$($AuditLevelEnum::Failure) {'Failed logins only'}
+				$($AuditLevelEnum::All) {'Both failed and successful logins'}
+				$null { $null }
+				default { $_.ToString() }
 			}
 		)
 	}
@@ -2283,11 +2283,11 @@ function Get-AuthenticationModeValue($LoginMode) {
 	} else {
 		Write-Output $(
 			switch ($LoginMode) {
-				$ServerLoginModeEnum::Normal {'SQL Server Authentication'}
-				$ServerLoginModeEnum::Integrated {'Windows Authentication'}
-				$ServerLoginModeEnum::Mixed {'SQL Server and Windows Authentication'}
-				$null { 'NULL' }
-				default {'Unknown'}
+				$($ServerLoginModeEnum::Normal) {'SQL Server Authentication'}
+				$($ServerLoginModeEnum::Integrated) {'Windows Authentication'}
+				$($ServerLoginModeEnum::Mixed) {'SQL Server and Windows Authentication'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2305,13 +2305,13 @@ function Get-AvailabilityDatabaseSynchronizationStatusValue($AvailabilityDatabas
 	} else {
 		Write-Output $(
 			switch ($AvailabilityDatabaseSynchronizationStatus) {
-				$AvailabilityDatabaseSynchronizationStateEnum::NotSynchronizing {'Not Synchronizing'}
-				$AvailabilityDatabaseSynchronizationStateEnum::Synchronizing {'Synchronizing'}
-				$AvailabilityDatabaseSynchronizationStateEnum::Synchronized {'Synchronized'}
-				$AvailabilityDatabaseSynchronizationStateEnum::Reverting {'Reverting'}
-				$AvailabilityDatabaseSynchronizationStateEnum::Initializing {'Initializing'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($AvailabilityDatabaseSynchronizationStateEnum::NotSynchronizing) {'Not Synchronizing'}
+				$($AvailabilityDatabaseSynchronizationStateEnum::Synchronizing) {'Synchronizing'}
+				$($AvailabilityDatabaseSynchronizationStateEnum::Synchronized) {'Synchronized'}
+				$($AvailabilityDatabaseSynchronizationStateEnum::Reverting) {'Reverting'}
+				$($AvailabilityDatabaseSynchronizationStateEnum::Initializing) {'Initializing'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2328,11 +2328,11 @@ function Get-BrokerMessageSourceValue($MessageSource) {
 	} else { 
 		Write-Output $(
 			switch ($MessageSource) {
-				$MessageSourceEnum::Initiator {'Initiator'}
-				$MessageSourceEnum::Target {'Target'}
-				$MessageSourceEnum::InitiatorAndTarget {'Initiator And Target'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($MessageSourceEnum::Initiator) {'Initiator'}
+				$($MessageSourceEnum::Target) {'Target'}
+				$($MessageSourceEnum::InitiatorAndTarget) {'Initiator And Target'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2349,12 +2349,12 @@ function Get-BrokerMessageTypeValidationValue($MessageTypeValidation) {
 	} else { 
 		Write-Output $(
 			switch ($MessageTypeValidation) {
-				$MessageTypeValidationEnum::None {'None'}
-				$MessageTypeValidationEnum::XmlSchemaCollection {'XML Schema Collection'}
-				$MessageTypeValidationEnum::Empty {'Empty'}
-				$MessageTypeValidationEnum::Xml {'XML'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($MessageTypeValidationEnum::None) {'None'}
+				$($MessageTypeValidationEnum::XmlSchemaCollection) {'XML Schema Collection'}
+				$($MessageTypeValidationEnum::Empty) {'Empty'}
+				$($MessageTypeValidationEnum::Xml) {'XML'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2371,18 +2371,18 @@ function Get-CatalogPopulationStatusValue($CatalogPopulationStatus) {
 	} else { 
 		Write-Output $(
 			switch ($CatalogPopulationStatus) {
-				$CatalogPopulationStatusEnum::Idle {'Idle'}
-				$CatalogPopulationStatusEnum::CrawlinProgress {'Crawl In Progress'}
-				$CatalogPopulationStatusEnum::Paused {'Paused'}
-				$CatalogPopulationStatusEnum::Throttled {'Throttled'}
-				$CatalogPopulationStatusEnum::Recovering {'Recovering'}
-				$CatalogPopulationStatusEnum::Shutdown {'Shutdown'}
-				$CatalogPopulationStatusEnum::Incremental {'Incremental'}
-				$CatalogPopulationStatusEnum::UpdatingIndex {'Updating Index'}
-				$CatalogPopulationStatusEnum::DiskFullPause {'Disk Full'}
-				$CatalogPopulationStatusEnum::Notification {'Notification'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($CatalogPopulationStatusEnum::Idle) {'Idle'}
+				$($CatalogPopulationStatusEnum::CrawlinProgress) {'Crawl In Progress'}
+				$($CatalogPopulationStatusEnum::Paused) {'Paused'}
+				$($CatalogPopulationStatusEnum::Throttled) {'Throttled'}
+				$($CatalogPopulationStatusEnum::Recovering) {'Recovering'}
+				$($CatalogPopulationStatusEnum::Shutdown) {'Shutdown'}
+				$($CatalogPopulationStatusEnum::Incremental) {'Incremental'}
+				$($CatalogPopulationStatusEnum::UpdatingIndex) {'Updating Index'}
+				$($CatalogPopulationStatusEnum::DiskFullPause) {'Disk Full'}
+				$($CatalogPopulationStatusEnum::Notification) {'Notification'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2399,17 +2399,17 @@ function Get-ChangeTrackingValue($ChangeTracking) {
 	} else { 
 		Write-Output $(
 			switch ($ChangeTracking) {
-				$ChangeTrackingEnum::Off {'Off'}
-				$ChangeTrackingEnum::Automatic {'Automatic'}
-				$ChangeTrackingEnum::Manual {'Manual'}
+				$($ChangeTrackingEnum::Off) {'Off'}
+				$($ChangeTrackingEnum::Automatic) {'Automatic'}
+				$($ChangeTrackingEnum::Manual) {'Manual'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$ChangeTrackingEnum::Off).value__ {'Off'}
-				(					$ChangeTrackingEnum::Automatic).value__ {'Automatic'}
-				(					$ChangeTrackingEnum::Manual).value__ {'Manual'}
+				$($ChangeTrackingEnum::Off).value__ {'Off'}
+				$($ChangeTrackingEnum::Automatic).value__ {'Automatic'}
+				$($ChangeTrackingEnum::Manual).value__ {'Manual'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2427,12 +2427,12 @@ function Get-ClusterQuorumStateValue($ClusterQuorumState) {
 	} else { 
 		Write-Output $(
 			switch ($ClusterQuorumState) {
-				$ClusterQuorumStateEnum::UnknownQuorumState {'Uknown'}
-				$ClusterQuorumStateEnum::NormalQuorum {'Normal'}
-				$ClusterQuorumStateEnum::ForcedQuorum {'Forced'}
-				$ClusterQuorumStateEnum::NotApplicable {'Not Applicable'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($ClusterQuorumStateEnum::UnknownQuorumState) {'Uknown'}
+				$($ClusterQuorumStateEnum::NormalQuorum) {'Normal'}
+				$($ClusterQuorumStateEnum::ForcedQuorum) {'Forced'}
+				$($ClusterQuorumStateEnum::NotApplicable) {'Not Applicable'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2450,13 +2450,13 @@ function Get-ClusterQuorumTypeValue($ClusterQuorumType) {
 	} else { 
 		Write-Output $(
 			switch ($ClusterQuorumType) {
-				$ClusterQuorumTypeEnum::NodeMajority {'Node Majority'}
-				$ClusterQuorumTypeEnum::NodeAndDiskMajority {'Node and Disk Majority'}
-				$ClusterQuorumTypeEnum::NodeAndFileshareMajority {'Node and Fileshare Majority'}
-				$ClusterQuorumTypeEnum::DiskOnly {'Disk Only'}
-				$ClusterQuorumTypeEnum::NotApplicable {'Not Applicable'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($ClusterQuorumTypeEnum::NodeMajority) {'Node Majority'}
+				$($ClusterQuorumTypeEnum::NodeAndDiskMajority) {'Node and Disk Majority'}
+				$($ClusterQuorumTypeEnum::NodeAndFileshareMajority) {'Node and Fileshare Majority'}
+				$($ClusterQuorumTypeEnum::DiskOnly) {'Disk Only'}
+				$($ClusterQuorumTypeEnum::NotApplicable) {'Not Applicable'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2473,11 +2473,11 @@ function Get-DatabaseDdlTriggerExecutionContextValue($DatabaseDdlTriggerExecutio
 	} else { 
 		Write-Output $(
 			switch ($DatabaseDdlTriggerExecutionContext) {
-				$DatabaseDdlTriggerExecutionContextEnum::Caller {'Caller'}
-				$DatabaseDdlTriggerExecutionContextEnum::ExecuteAsUser {'Execute As User'}
-				$DatabaseDdlTriggerExecutionContextEnum::Self {'Self'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($DatabaseDdlTriggerExecutionContextEnum::Caller) {'Caller'}
+				$($DatabaseDdlTriggerExecutionContextEnum::ExecuteAsUser) {'Execute As User'}
+				$($DatabaseDdlTriggerExecutionContextEnum::Self) {'Self'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2497,11 +2497,11 @@ function Get-DatabaseEngineTypeValue($DatabaseEngineType) {
 	} else { 
 		Write-Output $(
 			switch ($DatabaseEngineType) {
-				$DatabaseEngineTypeEnum::Standalone {$StandaloneDbEngine}
-				$DatabaseEngineTypeEnum::SqlAzureDatabase {$AzureDbEngine}
-				$DatabaseEngineTypeEnum::Unknown {'Unknown'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($DatabaseEngineTypeEnum::Standalone) {$StandaloneDbEngine}
+				$($DatabaseEngineTypeEnum::SqlAzureDatabase) {$AzureDbEngine}
+				$($DatabaseEngineTypeEnum::Unknown) {'Unknown'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2518,19 +2518,19 @@ function Get-DataCompressionTypeValue($DataCompressionType) {
 	} else { 
 		Write-Output $(
 			switch ($DataCompressionType) {
-				$DataCompressionTypeEnum::None {'None'}
-				$DataCompressionTypeEnum::Row {'Row'}
-				$DataCompressionTypeEnum::Page {'Page'}
-				$DataCompressionTypeEnum::ColumnStore {'Column Store'}
+				$($DataCompressionTypeEnum::None) {'None'}
+				$($DataCompressionTypeEnum::Row) {'Row'}
+				$($DataCompressionTypeEnum::Page) {'Page'}
+				$($DataCompressionTypeEnum::ColumnStore) {'Column Store'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$DataCompressionTypeEnum::None).value__ {'None'}
-				(					$DataCompressionTypeEnum::Row).value__ {'Row'}
-				(					$DataCompressionTypeEnum::Page).value__ {'Page'}
-				(					$DataCompressionTypeEnum::ColumnStore).value__ {'Column Store'}
+				$($DataCompressionTypeEnum::None).value__ {'None'}
+				$($DataCompressionTypeEnum::Row).value__ {'Row'}
+				$($DataCompressionTypeEnum::Page).value__ {'Page'}
+				$($DataCompressionTypeEnum::ColumnStore).value__ {'Column Store'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2546,11 +2546,11 @@ function Get-DatabaseUserAccessValue($UserAccess) {
 	} else {
 		Write-Output $(
 			switch ($UserAccess) {
-				$DatabaseUserAccessEnum::Single {'Single User'}
-				$DatabaseUserAccessEnum::Restricted {'Restricted User'}
-				$DatabaseUserAccessEnum::Multiple {'Multi User'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($DatabaseUserAccessEnum::Single) {'Single User'}
+				$($DatabaseUserAccessEnum::Restricted) {'Restricted User'}
+				$($DatabaseUserAccessEnum::Multiple) {'Multi User'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2566,12 +2566,12 @@ function Get-EndpointTypeValue($EndpointType) {
 	} else {
 		Write-Output $(
 			switch ($EndpointType) {
-				$EndpointTypeEnum::Soap {'SOAP'}
-				$EndpointTypeEnum::TSql {'TSQL'}
-				$EndpointTypeEnum::ServiceBroker {'Service Broker'}
-				$EndpointTypeEnum::DatabaseMirroring {'Database Mirroring'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($EndpointTypeEnum::Soap) {'SOAP'}
+				$($EndpointTypeEnum::TSql) {'TSQL'}
+				$($EndpointTypeEnum::ServiceBroker) {'Service Broker'}
+				$($EndpointTypeEnum::DatabaseMirroring) {'Database Mirroring'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2587,11 +2587,11 @@ function Get-EndpointStateValue($EndpointState) {
 	} else {
 		Write-Output $(
 			switch ($EndpointState) {
-				$EndpointStateEnum::Started {'Started'}
-				$EndpointStateEnum::Stopped {'Stopped'}
-				$EndpointStateEnum::Disabled {'Disabled'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'}
+				$($EndpointStateEnum::Started) {'Started'}
+				$($EndpointStateEnum::Stopped) {'Stopped'}
+				$($EndpointStateEnum::Disabled) {'Disabled'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2641,19 +2641,19 @@ function Get-ExecutionContextValue($ExecutionContext) {
 	} else { 
 		Write-Output $(
 			switch ($ExecutionContext) {
-				$ExecutionContextEnum::Caller {'Caller'}
-				$ExecutionContextEnum::Owner {'Owner'}
-				$ExecutionContextEnum::ExecuteAsUser {'Execute As User'}
-				$ExecutionContextEnum::Self {'Self'}
+				$($ExecutionContextEnum::Caller) {'Caller'}
+				$($ExecutionContextEnum::Owner) {'Owner'}
+				$($ExecutionContextEnum::ExecuteAsUser) {'Execute As User'}
+				$($ExecutionContextEnum::Self) {'Self'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$ExecutionContextEnum::Caller).value__ {'Caller'}
-				(					$ExecutionContextEnum::Owner).value__ {'Owner'}
-				(					$ExecutionContextEnum::ExecuteAsUser).value__ {'Execute As User'}
-				(					$ExecutionContextEnum::Self).value__ {'Self'}
+				$($ExecutionContextEnum::Caller).value__ {'Caller'}
+				$($ExecutionContextEnum::Owner).value__ {'Owner'}
+				$($ExecutionContextEnum::ExecuteAsUser).value__ {'Execute As User'}
+				$($ExecutionContextEnum::Self).value__ {'Self'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2670,19 +2670,19 @@ function Get-ForeignKeyActionValue($ForeignKeyAction) {
 	} else { 
 		Write-Output $(
 			switch ($ForeignKeyAction) {
-				$ForeignKeyActionEnum::NoAction {'No Action'}
-				$ForeignKeyActionEnum::Cascade {'Cascade'}
-				$ForeignKeyActionEnum::SetNull {'Set Null'}
-				$ForeignKeyActionEnum::SetDefault {'Set Default'}
+				$($ForeignKeyActionEnum::NoAction) {'No Action'}
+				$($ForeignKeyActionEnum::Cascade) {'Cascade'}
+				$($ForeignKeyActionEnum::SetNull) {'Set Null'}
+				$($ForeignKeyActionEnum::SetDefault) {'Set Default'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$ForeignKeyActionEnum::NoAction).value__ {'No Action'}
-				(					$ForeignKeyActionEnum::Cascade).value__ {'Cascade'}
-				(					$ForeignKeyActionEnum::SetNull).value__ {'Set Null'}
-				(					$ForeignKeyActionEnum::SetDefault).value__ {'Set Default'}
+				$($ForeignKeyActionEnum::NoAction).value__ {'No Action'}
+				$($ForeignKeyActionEnum::Cascade).value__ {'Cascade'}
+				$($ForeignKeyActionEnum::SetNull).value__ {'Set Null'}
+				$($ForeignKeyActionEnum::SetDefault).value__ {'Set Default'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2700,11 +2700,11 @@ function Get-FullTextCatalogUpgradeOptionValue($FullTextCatalogUpgradeOption) {
 	} else { 
 		Write-Output $(
 			switch ($FullTextCatalogUpgradeOption) {
-				$FullTextCatalogUpgradeOptionEnum::AlwaysRebuild {'Rebuild'}
-				$FullTextCatalogUpgradeOptionEnum::AlwaysReset {'Reset'}
-				$FullTextCatalogUpgradeOptionEnum::ImportWithRebuild {'Import'}
-				$null {$null} #$null {[String]$null}
-				default {'Rebuild'} 
+				$($FullTextCatalogUpgradeOptionEnum::AlwaysRebuild) {'Rebuild'}
+				$($FullTextCatalogUpgradeOptionEnum::AlwaysReset) {'Reset'}
+				$($FullTextCatalogUpgradeOptionEnum::ImportWithRebuild) {'Import'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2768,7 +2768,7 @@ function Get-FullTextLanguageValue($Language) {
 			3098 { 'Serbian (Cyrillic)'}
 			4100 { 'Chinese (Singapore)'}
 			5124 { 'Chinese (Macau SAR)'}
-			$null {$null} #$null {[String]$null}
+			$null {$null} 
 			default {'Unknown'} 
 		}
 	)
@@ -2784,11 +2784,11 @@ function Get-HadrManagerStatusValue($HadrManagerStatus) {
 	} else { 
 		Write-Output $(
 			switch ($HadrManagerStatus) {
-				$HadrManagerStatusEnum::PendingCommunication {'Pending Communication'}
-				$HadrManagerStatusEnum::Running {'Running'}
-				$HadrManagerStatusEnum::Failed {'Failed'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($HadrManagerStatusEnum::PendingCommunication) {'Pending Communication'}
+				$($HadrManagerStatusEnum::Running) {'Running'}
+				$($HadrManagerStatusEnum::Failed) {'Failed'}
+				$null { $null }
+				default { $_.ToString() }
 			}
 		)
 	}
@@ -2806,15 +2806,15 @@ function Get-ImplementationTypeValue($ImplementationType) {
 	} else {
 		Write-Output $(
 			switch ($ImplementationType) {
-				$ImplementationTypeEnum::TransactSql {'T-SQL'}
-				$ImplementationTypeEnum::SqlClr {'CLR'}
+				$($ImplementationTypeEnum::TransactSql) {'T-SQL'}
+				$($ImplementationTypeEnum::SqlClr) {'CLR'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$ImplementationTypeEnum::TransactSql).value__ {'T-SQL'}
-				(					$ImplementationTypeEnum::SqlClr).value__ {'CLR'}
+				$($ImplementationTypeEnum::TransactSql).value__ {'T-SQL'}
+				$($ImplementationTypeEnum::SqlClr).value__ {'CLR'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2831,23 +2831,23 @@ function Get-IndexPopulationStatusValue($IndexPopulationStatus) {
 	} else { 
 		Write-Output $(
 			switch ($IndexPopulationStatus) {
-				$IndexPopulationStatusEnum::None {'None'}
-				$IndexPopulationStatusEnum::Full {'Full'}
-				$IndexPopulationStatusEnum::Incremental {'Incremental'}
-				$IndexPopulationStatusEnum::Manual {'Manual'}
-				$IndexPopulationStatusEnum::Background {'Background'}
-				$IndexPopulationStatusEnum::PausedOrThrottled {'Paused Or Throttled'}
+				$($IndexPopulationStatusEnum::None) {'None'}
+				$($IndexPopulationStatusEnum::Full) {'Full'}
+				$($IndexPopulationStatusEnum::Incremental) {'Incremental'}
+				$($IndexPopulationStatusEnum::Manual) {'Manual'}
+				$($IndexPopulationStatusEnum::Background) {'Background'}
+				$($IndexPopulationStatusEnum::PausedOrThrottled) {'Paused Or Throttled'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$IndexPopulationStatusEnum::None).value__ {'None'}
-				(					$IndexPopulationStatusEnum::Full).value__ {'Full'}
-				(					$IndexPopulationStatusEnum::Incremental).value__ {'Incremental'}
-				(					$IndexPopulationStatusEnum::Manual).value__ {'Manual'}
-				(					$IndexPopulationStatusEnum::Background).value__ {'Background'}
-				(					$IndexPopulationStatusEnum::PausedOrThrottled).value__ {'Paused Or Throttled'}
+				$($IndexPopulationStatusEnum::None).value__ {'None'}
+				$($IndexPopulationStatusEnum::Full).value__ {'Full'}
+				$($IndexPopulationStatusEnum::Incremental).value__ {'Incremental'}
+				$($IndexPopulationStatusEnum::Manual).value__ {'Manual'}
+				$($IndexPopulationStatusEnum::Background).value__ {'Background'}
+				$($IndexPopulationStatusEnum::PausedOrThrottled).value__ {'Paused Or Throttled'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2864,17 +2864,17 @@ function Get-IndexKeyTypeValue($IndexKeyType) {
 	} else { 
 		Write-Output $(
 			switch ($IndexKeyType) {
-				$IndexKeyTypeEnum::None {'None'}
-				$IndexKeyTypeEnum::DriPrimaryKey {'Primary Key'}
-				$IndexKeyTypeEnum::DriUniqueKey {'Unique Constraint'}
+				$($IndexKeyTypeEnum::None) {'None'}
+				$($IndexKeyTypeEnum::DriPrimaryKey) {'Primary Key'}
+				$($IndexKeyTypeEnum::DriUniqueKey) {'Unique Constraint'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$IndexKeyTypeEnum::None).value__ {'None'}
-				(					$IndexKeyTypeEnum::DriPrimaryKey).value__ {'Primary Key'}
-				(					$IndexKeyTypeEnum::DriUniqueKey).value__ {'Unique Constraint'}
+				$($IndexKeyTypeEnum::None).value__ {'None'}
+				$($IndexKeyTypeEnum::DriPrimaryKey).value__ {'Primary Key'}
+				$($IndexKeyTypeEnum::DriUniqueKey).value__ {'Unique Constraint'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2891,27 +2891,27 @@ function Get-IndexTypeValue($IndexType) {
 	} else { 
 		Write-Output $(
 			switch ($IndexType) {
-				$IndexTypeEnum::ClusteredIndex {'Clustered'}
-				$IndexTypeEnum::NonClusteredIndex {'Nonclustered'}
-				$IndexTypeEnum::PrimaryXmlIndex {'Primary XML'}
-				$IndexTypeEnum::SecondaryXmlIndex {'Secondary XML'}
-				$IndexTypeEnum::SpatialIndex {'Spatial'}
-				$IndexTypeEnum::NonClusteredColumnStoreIndex {'Nonclustered columnstore'}
-				$IndexTypeEnum::SelectiveXmlIndex {'Selective XML'}
-				$IndexTypeEnum::SecondarySelectiveXmlIndex {'Secondary Selective XML'}
+				$($IndexTypeEnum::ClusteredIndex) {'Clustered'}
+				$($IndexTypeEnum::NonClusteredIndex) {'Nonclustered'}
+				$($IndexTypeEnum::PrimaryXmlIndex) {'Primary XML'}
+				$($IndexTypeEnum::SecondaryXmlIndex) {'Secondary XML'}
+				$($IndexTypeEnum::SpatialIndex) {'Spatial'}
+				$($IndexTypeEnum::NonClusteredColumnStoreIndex) {'Nonclustered columnstore'}
+				$($IndexTypeEnum::SelectiveXmlIndex) {'Selective XML'}
+				$($IndexTypeEnum::SecondarySelectiveXmlIndex) {'Secondary Selective XML'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$IndexTypeEnum::ClusteredIndex).value__ {'Clustered'}
-				(					$IndexTypeEnum::NonClusteredIndex).value__ {'Nonclustered'}
-				(					$IndexTypeEnum::PrimaryXmlIndex).value__ {'Primary XML'}
-				(					$IndexTypeEnum::SecondaryXmlIndex).value__ {'Secondary XML'}
-				(					$IndexTypeEnum::SpatialIndex).value__ {'Spatial'}
-				(					$IndexTypeEnum::NonClusteredColumnStoreIndex).value__ {'Nonclustered columnstore'}
-				(					$IndexTypeEnum::SelectiveXmlIndex).value__ {'Selective XML'}
-				(					$IndexTypeEnum::SecondarySelectiveXmlIndex).value__ {'Secondary Selective XML'} 
+				$($IndexTypeEnum::ClusteredIndex).value__ {'Clustered'}
+				$($IndexTypeEnum::NonClusteredIndex).value__ {'Nonclustered'}
+				$($IndexTypeEnum::PrimaryXmlIndex).value__ {'Primary XML'}
+				$($IndexTypeEnum::SecondaryXmlIndex).value__ {'Secondary XML'}
+				$($IndexTypeEnum::SpatialIndex).value__ {'Spatial'}
+				$($IndexTypeEnum::NonClusteredColumnStoreIndex).value__ {'Nonclustered columnstore'}
+				$($IndexTypeEnum::SelectiveXmlIndex).value__ {'Selective XML'}
+				$($IndexTypeEnum::SecondarySelectiveXmlIndex).value__ {'Secondary Selective XML'} 
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2927,11 +2927,11 @@ function Get-JobServerTypeValue($JobServerType) {
 	} else {
 		Write-Output $(
 			switch ($JobServerType) {
-				$JobServerTypeEnum::Standalone {'Standalone'}
-				$JobServerTypeEnum::Tsx {'Target Server'}
-				$JobServerTypeEnum::Msx {'Master Server'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($JobServerTypeEnum::Standalone) {'Standalone'}
+				$($JobServerTypeEnum::Tsx) {'Target Server'}
+				$($JobServerTypeEnum::Msx) {'Master Server'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -2977,7 +2977,7 @@ function Get-LanguageValue($Language) {
 			31 { 'Arabic'}
 			32 { 'Thai'}
 			33 { 'Bokmål'} 
-			$null {$null} #$null {[String]$null}
+			$null {$null}
 			default {'Unknown'} 
 		}
 	)
@@ -2992,13 +2992,13 @@ function Get-LoginTypeValue($LoginType) {
 	} else {
 		Write-Output $(
 			switch ($LoginType) {
-				$LoginTypeEnum::WindowsUser {'Windows User'}
-				$LoginTypeEnum::WindowsGroup {'Windows Group'}
-				$LoginTypeEnum::SqlLogin {'SQL Login'}
-				$LoginTypeEnum::Certificate {'Certificate'}
-				$LoginTypeEnum::AsymmetricKey {'Asymmetric Key'}
-				$null {$null} #$null {[String]$null}
-				default {'User Without Login'} 
+				$($LoginTypeEnum::WindowsUser) {'Windows User'}
+				$($LoginTypeEnum::WindowsGroup) {'Windows Group'}
+				$($LoginTypeEnum::SqlLogin) {'SQL Login'}
+				$($LoginTypeEnum::Certificate) {'Certificate'}
+				$($LoginTypeEnum::AsymmetricKey) {'Asymmetric Key'}
+				$null { $null }
+				default { $_.ToString() }
 			}
 		)
 	}
@@ -3014,12 +3014,12 @@ function Get-MirroringSafetyLevelValue($MirroringSafetyLevel) {
 	} else {
 		Write-Output $(
 			switch ($MirroringSafetyLevel) {
-				$MirroringSafetyLevelEnum::None {'None'}
-				$MirroringSafetyLevelEnum::Unknown {'Unknown'}
-				$MirroringSafetyLevelEnum::Off {'Off'}
-				$MirroringSafetyLevelEnum::Full {'Full'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($MirroringSafetyLevelEnum::None) {'None'}
+				$($MirroringSafetyLevelEnum::Unknown) {'Unknown'}
+				$($MirroringSafetyLevelEnum::Off) {'Off'}
+				$($MirroringSafetyLevelEnum::Full) {'Full'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3035,14 +3035,14 @@ function Get-MirroringStatusValue($MirroringStatus) {
 	} else {
 		Write-Output $(
 			switch ($MirroringStatus) {
-				$MirroringStatusEnum::None {'None'}
-				$MirroringStatusEnum::Suspended {'Suspended'}
-				$MirroringStatusEnum::Disconnected {'Disconnected'}
-				$MirroringStatusEnum::Synchronizing {'Synchronizing'}
-				$MirroringStatusEnum::PendingFailover {'Pending Failover'}
-				$MirroringStatusEnum::Synchronized {'Synchronized'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($MirroringStatusEnum::None) {'None'}
+				$($MirroringStatusEnum::Suspended) {'Suspended'}
+				$($MirroringStatusEnum::Disconnected) {'Disconnected'}
+				$($MirroringStatusEnum::Synchronizing) {'Synchronizing'}
+				$($MirroringStatusEnum::PendingFailover) {'Pending Failover'}
+				$($MirroringStatusEnum::Synchronized) {'Synchronized'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3058,12 +3058,12 @@ function Get-MirroringWitnessStatusValue($MirroringWitnessStatus) {
 	} else {
 		Write-Output $(
 			switch ($MirroringWitnessStatus) {
-				$MirroringWitnessStatusEnum::None {'None'}
-				$MirroringWitnessStatusEnum::Unknown {'Unknown'}
-				$MirroringWitnessStatusEnum::Connected {'Connected'}
-				$MirroringWitnessStatusEnum::Disconnected {'Disconnected'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($MirroringWitnessStatusEnum::None) {'None'}
+				$($MirroringWitnessStatusEnum::Unknown) {'Unknown'}
+				$($MirroringWitnessStatusEnum::Connected) {'Connected'}
+				$($MirroringWitnessStatusEnum::Disconnected) {'Disconnected'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3079,11 +3079,11 @@ function Get-OnFailureActionValue($OnFailureAction) {
 	} else {
 		Write-Output $(
 			switch ($OnFailureAction) {
-				$OnFailureActionEnum::Continue {'Continue'}
-				$OnFailureActionEnum::Shutdown {'Shut Down Server'}
-				$OnFailureActionEnum::FailOperation {'Fail Operation'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($OnFailureActionEnum::Continue) {'Continue'}
+				$($OnFailureActionEnum::Shutdown) {'Shut Down Server'}
+				$($OnFailureActionEnum::FailOperation) {'Fail Operation'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3100,33 +3100,33 @@ function Get-ObjectClassValue($ObjectClass) {
 	} else { 
 		Write-Output $(
 			switch ($ObjectClass) {
-				$ObjectClassEnum::Database {'Database'}
-				$ObjectClassEnum::ObjectOrColumn {'Object Or Column'}
-				$ObjectClassEnum::Schema {'Schema'}
-				$ObjectClassEnum::User {'User'}
-				$ObjectClassEnum::DatabaseRole {'Database Role'}
-				$ObjectClassEnum::ApplicationRole {'Application Role'}
-				$ObjectClassEnum::SqlAssembly {'SQL Assembly'}
-				$ObjectClassEnum::UserDefinedType {'User Defined Type'}
-				$ObjectClassEnum::SecurityExpression {'Security Expression'}
-				$ObjectClassEnum::XmlNamespace {'XML Namespace'}
-				$ObjectClassEnum::MessageType {'Message Type'}
-				$ObjectClassEnum::ServiceContract {'Service Contract'}
-				$ObjectClassEnum::Service {'Service'}
-				$ObjectClassEnum::RemoteServiceBinding {'Remote Service Binding'}
-				$ObjectClassEnum::ServiceRoute {'Service Route'}
-				$ObjectClassEnum::FullTextCatalog {'Full-Text Catalog'}
-				$ObjectClassEnum::SymmetricKey {'Symmetric Key'}
-				$ObjectClassEnum::Server {'Server'}
-				$ObjectClassEnum::Login {'Login'}
-				$ObjectClassEnum::ServerPrincipal {'Server Principal'}
-				$ObjectClassEnum::ServerRole {'Server Role'}
-				$ObjectClassEnum::Endpoint {'Endpoint'}
-				$ObjectClassEnum::Certificate {'Certificate'}
-				$ObjectClassEnum::FullTextStopList {'Full-Text Stop List'}
-				$ObjectClassEnum::AsymmetricKey {'Asymmetric Key'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($ObjectClassEnum::Database) {'Database'}
+				$($ObjectClassEnum::ObjectOrColumn) {'Object Or Column'}
+				$($ObjectClassEnum::Schema) {'Schema'}
+				$($ObjectClassEnum::User) {'User'}
+				$($ObjectClassEnum::DatabaseRole) {'Database Role'}
+				$($ObjectClassEnum::ApplicationRole) {'Application Role'}
+				$($ObjectClassEnum::SqlAssembly) {'SQL Assembly'}
+				$($ObjectClassEnum::UserDefinedType) {'User Defined Type'}
+				$($ObjectClassEnum::SecurityExpression) {'Security Expression'}
+				$($ObjectClassEnum::XmlNamespace) {'XML Namespace'}
+				$($ObjectClassEnum::MessageType) {'Message Type'}
+				$($ObjectClassEnum::ServiceContract) {'Service Contract'}
+				$($ObjectClassEnum::Service) {'Service'}
+				$($ObjectClassEnum::RemoteServiceBinding) {'Remote Service Binding'}
+				$($ObjectClassEnum::ServiceRoute) {'Service Route'}
+				$($ObjectClassEnum::FullTextCatalog) {'Full-Text Catalog'}
+				$($ObjectClassEnum::SymmetricKey) {'Symmetric Key'}
+				$($ObjectClassEnum::Server) {'Server'}
+				$($ObjectClassEnum::Login) {'Login'}
+				$($ObjectClassEnum::ServerPrincipal) {'Server Principal'}
+				$($ObjectClassEnum::ServerRole) {'Server Role'}
+				$($ObjectClassEnum::Endpoint) {'Endpoint'}
+				$($ObjectClassEnum::Certificate) {'Certificate'}
+				$($ObjectClassEnum::FullTextStopList) {'Full-Text Stop List'}
+				$($ObjectClassEnum::AsymmetricKey) {'Asymmetric Key'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3153,11 +3153,11 @@ function Get-PageVerifyValue($PageVerify) {
 	} else {
 		Write-Output $(
 			switch ($PageVerify) {
-				$PageVerifyEnum::None {'NONE'}
-				$PageVerifyEnum::TornPageDetection {'TORN_PAGE_DETECTION'}
-				$PageVerifyEnum::Checksum {'CHECKSUM'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($PageVerifyEnum::None) {'NONE'}
+				$($PageVerifyEnum::TornPageDetection) {'TORN_PAGE_DETECTION'}
+				$($PageVerifyEnum::Checksum) {'CHECKSUM'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3174,12 +3174,12 @@ function Get-PermissionStateValue($PermissionState) {
 	} else { 
 		Write-Output $(
 			switch ($PermissionState) {
-				$PermissionStateEnum::Deny {'Deny'}
-				$PermissionStateEnum::Revoke {'Revoke'}
-				$PermissionStateEnum::Grant {'Grant'}
-				$PermissionStateEnum::GrantWithGrant {'Grant With Grant'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($PermissionStateEnum::Deny) {'Deny'}
+				$($PermissionStateEnum::Revoke) {'Revoke'}
+				$($PermissionStateEnum::Grant) {'Grant'}
+				$($PermissionStateEnum::GrantWithGrant) {'Grant With Grant'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3196,14 +3196,14 @@ function Get-PrincipalTypeValue($PrincipalType) {
 	} else { 
 		Write-Output $(
 			switch ($PrincipalType) {
-				$PrincipalTypeEnum::None {'None'}
-				$PrincipalTypeEnum::Login {'Login'}
-				$PrincipalTypeEnum::ServerRole {'Server Role'}
-				$PrincipalTypeEnum::User {'User'}
-				$PrincipalTypeEnum::DatabaseRole {'Database Role'}
-				$PrincipalTypeEnum::ApplicationRole {'Application Role'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($PrincipalTypeEnum::None) {'None'}
+				$($PrincipalTypeEnum::Login) {'Login'}
+				$($PrincipalTypeEnum::ServerRole) {'Server Role'}
+				$($PrincipalTypeEnum::User) {'User'}
+				$($PrincipalTypeEnum::DatabaseRole) {'Database Role'}
+				$($PrincipalTypeEnum::ApplicationRole) {'Application Role'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3219,12 +3219,12 @@ function Get-PrivateKeyEncryptionTypeValue($PrivateKeyEncryptionType) {
 	} else {
 		Write-Output $(
 			switch ($PrivateKeyEncryptionType) {
-				$PrivateKeyEncryptionTypeEnum::NoKey {'No Key'}
-				$PrivateKeyEncryptionTypeEnum::MasterKey {'Master Key'}
-				$PrivateKeyEncryptionTypeEnum::Password {'User Password'}
-				$PrivateKeyEncryptionTypeEnum::Provider {'Encryption Provider'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($PrivateKeyEncryptionTypeEnum::NoKey) {'No Key'}
+				$($PrivateKeyEncryptionTypeEnum::MasterKey) {'Master Key'}
+				$($PrivateKeyEncryptionTypeEnum::Password) {'User Password'}
+				$($PrivateKeyEncryptionTypeEnum::Provider) {'Encryption Provider'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3240,13 +3240,13 @@ function Get-ProtocolTypeValue($ProtocolType) {
 	} else {
 		Write-Output $(
 			switch ($ProtocolType) {
-				$ProtocolTypeEnum::Http {'HTTP'}
-				$ProtocolTypeEnum::Tcp {'TCP/IP'}
-				$ProtocolTypeEnum::NamedPipes {'Named pipes'}
-				$ProtocolTypeEnum::SharedMemory {'Shared memory'}
-				$ProtocolTypeEnum::Via {'VIA'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'}
+				$($ProtocolTypeEnum::Http) {'HTTP'}
+				$($ProtocolTypeEnum::Tcp) {'TCP/IP'}
+				$($ProtocolTypeEnum::NamedPipes) {'Named pipes'}
+				$($ProtocolTypeEnum::SharedMemory) {'Shared memory'}
+				$($ProtocolTypeEnum::Via) {'VIA'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3263,17 +3263,17 @@ function Get-RangeTypeValue($RangeType) {
 	} else { 
 		Write-Output $(
 			switch ($RangeType) {
-				$RangeTypeEnum::None {'None'}
-				$RangeTypeEnum::Left {'Left'}
-				$RangeTypeEnum::Right {'Right'}
+				$($RangeTypeEnum::None) {'None'}
+				$($RangeTypeEnum::Left) {'Left'}
+				$($RangeTypeEnum::Right) {'Right'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$RangeTypeEnum::None).value__ {'None'}
-				(					$RangeTypeEnum::Left).value__ {'Left'}
-				(					$RangeTypeEnum::Right).value__ {'Right'}
+				$($RangeTypeEnum::None).value__ {'None'}
+				$($RangeTypeEnum::Left).value__ {'Left'}
+				$($RangeTypeEnum::Right).value__ {'Right'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 
 
@@ -3300,19 +3300,19 @@ function Get-SecondaryXmlIndexTypeValue($SecondaryXmlIndexType) {
 	} else { 
 		Write-Output $(
 			switch ($SecondaryXmlIndexType) {
-				$SecondaryXmlIndexTypeEnum::None {'None'}
-				$SecondaryXmlIndexTypeEnum::Path {'Path'}
-				$SecondaryXmlIndexTypeEnum::Value {'Value'}
-				$SecondaryXmlIndexTypeEnum::Property {'Property'}
+				$($SecondaryXmlIndexTypeEnum::None) {'None'}
+				$($SecondaryXmlIndexTypeEnum::Path) {'Path'}
+				$($SecondaryXmlIndexTypeEnum::Value) {'Value'}
+				$($SecondaryXmlIndexTypeEnum::Property) {'Property'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$SecondaryXmlIndexTypeEnum::None).value__ {'None'}
-				(					$SecondaryXmlIndexTypeEnum::Path).value__ {'Path'}
-				(					$SecondaryXmlIndexTypeEnum::Value).value__ {'Value'}
-				(					$SecondaryXmlIndexTypeEnum::Property).value__ {'Property'}
+				$($SecondaryXmlIndexTypeEnum::None).value__ {'None'}
+				$($SecondaryXmlIndexTypeEnum::Path).value__ {'Path'}
+				$($SecondaryXmlIndexTypeEnum::Value).value__ {'Value'}
+				$($SecondaryXmlIndexTypeEnum::Property).value__ {'Property'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3329,11 +3329,11 @@ function Get-SequenceCacheTypeValue($SequenceCacheType) {
 	} else { 
 		Write-Output $(
 			switch ($SequenceCacheType) {
-				$SequenceCacheTypeEnum::DefaultCache {'Default Size'}
-				$SequenceCacheTypeEnum::NoCache {'No Cache'}
-				$SequenceCacheTypeEnum::CacheWithSize {'Cache Size'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($SequenceCacheTypeEnum::DefaultCache) {'Default Size'}
+				$($SequenceCacheTypeEnum::NoCache) {'No Cache'}
+				$($SequenceCacheTypeEnum::CacheWithSize) {'Cache Size'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3349,12 +3349,12 @@ function Get-SnapshotIsolationStateValue($SnapshotIsolationState) {
 	} else {
 		Write-Output $(
 			switch ($SnapshotIsolationState) {
-				$SnapshotIsolationStateEnum::Disabled {'Disabled'}
-				$SnapshotIsolationStateEnum::Enabled {'Enabled'}
-				$SnapshotIsolationStateEnum::PendingOff {'Pending Off'}
-				$SnapshotIsolationStateEnum::PendingOn {'Pending On'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($SnapshotIsolationStateEnum::Disabled) {'Disabled'}
+				$($SnapshotIsolationStateEnum::Enabled) {'Enabled'}
+				$($SnapshotIsolationStateEnum::PendingOff) {'Pending Off'}
+				$($SnapshotIsolationStateEnum::PendingOn) {'Pending On'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3371,19 +3371,19 @@ function Get-SpatialGeoLevelSizeValue($SpatialGeoLevelSize) {
 	} else { 
 		Write-Output $(
 			switch ($SpatialGeoLevelSize) {
-				$SpatialGeoLevelSizeEnum::None {'None'}
-				$SpatialGeoLevelSizeEnum::Low {'Low'}
-				$SpatialGeoLevelSizeEnum::Medium {'Medium'}
-				$SpatialGeoLevelSizeEnum::High {'High'}
+				$($SpatialGeoLevelSizeEnum::None) {'None'}
+				$($SpatialGeoLevelSizeEnum::Low) {'Low'}
+				$($SpatialGeoLevelSizeEnum::Medium) {'Medium'}
+				$($SpatialGeoLevelSizeEnum::High) {'High'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$SpatialGeoLevelSizeEnum::None).value__ {'None'}
-				(					$SpatialGeoLevelSizeEnum::Low).value__ {'Low'}
-				(					$SpatialGeoLevelSizeEnum::Medium).value__ {'Medium'}
-				(					$SpatialGeoLevelSizeEnum::High).value__ {'High'}
+				$($SpatialGeoLevelSizeEnum::None).value__ {'None'}
+				$($SpatialGeoLevelSizeEnum::Low).value__ {'Low'}
+				$($SpatialGeoLevelSizeEnum::Medium).value__ {'Medium'}
+				$($SpatialGeoLevelSizeEnum::High).value__ {'High'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3400,17 +3400,17 @@ function Get-SpatialIndexTypeValue($SpatialIndexType) {
 	} else { 
 		Write-Output $(
 			switch ($SpatialIndexType) {
-				$SpatialIndexTypeEnum::None {'None'}
-				$SpatialIndexTypeEnum::GeometryGrid {'Geometry'}
-				$SpatialIndexTypeEnum::GeographyGrid {'Geography'}
+				$($SpatialIndexTypeEnum::None) {'None'}
+				$($SpatialIndexTypeEnum::GeometryGrid) {'Geometry'}
+				$($SpatialIndexTypeEnum::GeographyGrid) {'Geography'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$SpatialIndexTypeEnum::None).value__ {'None'}
-				(					$SpatialIndexTypeEnum::GeometryGrid).value__ {'Geometry'}
-				(					$SpatialIndexTypeEnum::GeographyGrid).value__ {'Geography'}
+				$($SpatialIndexTypeEnum::None).value__ {'None'}
+				$($SpatialIndexTypeEnum::GeometryGrid).value__ {'Geometry'}
+				$($SpatialIndexTypeEnum::GeographyGrid).value__ {'Geography'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3427,50 +3427,50 @@ function Get-SqlDataTypeValue($SqlDataType) {
 	} else { 
 		Write-Output $(
 			switch ($SqlDataType) {
-				$SqlDataTypeEnum::None {'None'}
-				$SqlDataTypeEnum::BigInt {'BigInt'}
-				$SqlDataTypeEnum::Binary {'Binary'}
-				$SqlDataTypeEnum::Bit {'Bit'}
-				$SqlDataTypeEnum::Char {'Char'}
-				$SqlDataTypeEnum::DateTime {'DateTime'}
-				$SqlDataTypeEnum::Decimal {'Decimal'}
-				$SqlDataTypeEnum::Float {'Float'}
-				$SqlDataTypeEnum::Image {'Image'}
-				$SqlDataTypeEnum::Int {'Int'}
-				$SqlDataTypeEnum::Money {'Money'}
-				$SqlDataTypeEnum::NChar {'NChar'}
-				$SqlDataTypeEnum::NText {'NText'}
-				$SqlDataTypeEnum::NVarChar {'NVarChar'}
-				$SqlDataTypeEnum::NVarCharMax {'NVarCharMax'}
-				$SqlDataTypeEnum::Real {'Real'}
-				$SqlDataTypeEnum::SmallDateTime {'SmallDateTime'}
-				$SqlDataTypeEnum::SmallInt {'SmallInt'}
-				$SqlDataTypeEnum::SmallMoney {'SmallMoney'}
-				$SqlDataTypeEnum::SmallMoney {'SmallMoney'}
-				$SqlDataTypeEnum::Text {'Text'}
-				$SqlDataTypeEnum::Timestamp {'Timestamp'}
-				$SqlDataTypeEnum::TinyInt {'TinyInt'}
-				$SqlDataTypeEnum::UniqueIdentifier {'UniqueIdentifier'}
-				$SqlDataTypeEnum::UserDefinedDataType {'User Defined Data Type'}
-				$SqlDataTypeEnum::UserDefinedType {'User Defined Type'}
-				$SqlDataTypeEnum::VarBinary {'VarBinary'}
-				$SqlDataTypeEnum::VarBinaryMax {'VarBinaryMax'}
-				$SqlDataTypeEnum::VarChar {'VarChar'}
-				$SqlDataTypeEnum::VarCharMax {'VarCharMax'}
-				$SqlDataTypeEnum::Variant {'Variant'}
-				$SqlDataTypeEnum::Xml {'Xml'}
-				$SqlDataTypeEnum::SysName {'SysName'}
-				$SqlDataTypeEnum::Numeric {'Numeric'}
-				$SqlDataTypeEnum::Date {'Date'}
-				$SqlDataTypeEnum::Time {'Time'}
-				$SqlDataTypeEnum::DateTimeOffset {'DateTimeOffset'}
-				$SqlDataTypeEnum::DateTime2 {'DateTime2'}
-				$SqlDataTypeEnum::UserDefinedTableType {'User Defined Table Type'}
-				$SqlDataTypeEnum::HierarchyId {'HierarchyId'}
-				$SqlDataTypeEnum::Geometry {'Geometry'}
-				$SqlDataTypeEnum::Geography {'Geography'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($SqlDataTypeEnum::None) {'None'}
+				$($SqlDataTypeEnum::BigInt) {'BigInt'}
+				$($SqlDataTypeEnum::Binary) {'Binary'}
+				$($SqlDataTypeEnum::Bit) {'Bit'}
+				$($SqlDataTypeEnum::Char) {'Char'}
+				$($SqlDataTypeEnum::DateTime) {'DateTime'}
+				$($SqlDataTypeEnum::Decimal) {'Decimal'}
+				$($SqlDataTypeEnum::Float) {'Float'}
+				$($SqlDataTypeEnum::Image) {'Image'}
+				$($SqlDataTypeEnum::Int) {'Int'}
+				$($SqlDataTypeEnum::Money) {'Money'}
+				$($SqlDataTypeEnum::NChar) {'NChar'}
+				$($SqlDataTypeEnum::NText) {'NText'}
+				$($SqlDataTypeEnum::NVarChar) {'NVarChar'}
+				$($SqlDataTypeEnum::NVarCharMax) {'NVarCharMax'}
+				$($SqlDataTypeEnum::Real) {'Real'}
+				$($SqlDataTypeEnum::SmallDateTime) {'SmallDateTime'}
+				$($SqlDataTypeEnum::SmallInt) {'SmallInt'}
+				$($SqlDataTypeEnum::SmallMoney) {'SmallMoney'}
+				$($SqlDataTypeEnum::SmallMoney) {'SmallMoney'}
+				$($SqlDataTypeEnum::Text) {'Text'}
+				$($SqlDataTypeEnum::Timestamp) {'Timestamp'}
+				$($SqlDataTypeEnum::TinyInt) {'TinyInt'}
+				$($SqlDataTypeEnum::UniqueIdentifier) {'UniqueIdentifier'}
+				$($SqlDataTypeEnum::UserDefinedDataType) {'User Defined Data Type'}
+				$($SqlDataTypeEnum::UserDefinedType) {'User Defined Type'}
+				$($SqlDataTypeEnum::VarBinary) {'VarBinary'}
+				$($SqlDataTypeEnum::VarBinaryMax) {'VarBinaryMax'}
+				$($SqlDataTypeEnum::VarChar) {'VarChar'}
+				$($SqlDataTypeEnum::VarCharMax) {'VarCharMax'}
+				$($SqlDataTypeEnum::Variant) {'Variant'}
+				$($SqlDataTypeEnum::Xml) {'Xml'}
+				$($SqlDataTypeEnum::SysName) {'SysName'}
+				$($SqlDataTypeEnum::Numeric) {'Numeric'}
+				$($SqlDataTypeEnum::Date) {'Date'}
+				$($SqlDataTypeEnum::Time) {'Time'}
+				$($SqlDataTypeEnum::DateTimeOffset) {'DateTimeOffset'}
+				$($SqlDataTypeEnum::DateTime2) {'DateTime2'}
+				$($SqlDataTypeEnum::UserDefinedTableType) {'User Defined Table Type'}
+				$($SqlDataTypeEnum::HierarchyId) {'HierarchyId'}
+				$($SqlDataTypeEnum::Geometry) {'Geometry'}
+				$($SqlDataTypeEnum::Geography) {'Geography'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3487,17 +3487,17 @@ function Get-StopListOptionValue($StopListOption) {
 	} else { 
 		Write-Output $(
 			switch ($StopListOption) {
-				$StopListOptionEnum::Off {'Off'}
-				$StopListOptionEnum::System {'System'}
-				$StopListOptionEnum::Name {'Name'}
+				$($StopListOptionEnum::Off) {'Off'}
+				$($StopListOptionEnum::System) {'System'}
+				$($StopListOptionEnum::Name) {'Name'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$StopListOptionEnum::Off).value__ {'Off'}
-				(					$StopListOptionEnum::System).value__ {'System'}
-				(					$StopListOptionEnum::Name).value__ {'Name'}
+				$($StopListOptionEnum::Off).value__ {'Off'}
+				$($StopListOptionEnum::System).value__ {'System'}
+				$($StopListOptionEnum::Name).value__ {'Name'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3513,11 +3513,11 @@ function Get-ServerDdlTriggerExecutionContextValue($ServerDdlTriggerExecutionCon
 	} else {
 		Write-Output $(
 			switch ($ServerDdlTriggerExecutionContext) {
-				$ServerDdlTriggerExecutionContextEnum::Caller {'Execute As Caller'}
-				$ServerDdlTriggerExecutionContextEnum::ExecuteAsLogin {'Execute As Login'}
-				$ServerDdlTriggerExecutionContextEnum::Self {'Execute As Self'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($ServerDdlTriggerExecutionContextEnum::Caller) {'Execute As Caller'}
+				$($ServerDdlTriggerExecutionContextEnum::ExecuteAsLogin) {'Execute As Login'}
+				$($ServerDdlTriggerExecutionContextEnum::Self) {'Execute As Self'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3533,18 +3533,18 @@ function Get-SymmetricKeyEncryptionAlgorithmValue($SymmetricKeyEncryptionAlgorit
 	} else {
 		Write-Output $(
 			switch ($SymmetricKeyEncryptionAlgorithm) {
-				$SymmetricKeyEncryptionAlgorithmEnum::CryptographicProviderDefined {'Cryptographic Provider'}
-				$SymmetricKeyEncryptionAlgorithmEnum::RC2 {'RC2'}
-				$SymmetricKeyEncryptionAlgorithmEnum::RC4 {'RC4'}
-				$SymmetricKeyEncryptionAlgorithmEnum::Des {'DES'}
-				$SymmetricKeyEncryptionAlgorithmEnum::TripleDes {'Triple DES'}
-				$SymmetricKeyEncryptionAlgorithmEnum::DesX {'DESX'}
-				$SymmetricKeyEncryptionAlgorithmEnum::Aes128 {'AES 128'}
-				$SymmetricKeyEncryptionAlgorithmEnum::Aes192 {'AES 192'}
-				$SymmetricKeyEncryptionAlgorithmEnum::Aes256 {'AES 256'}
-				$SymmetricKeyEncryptionAlgorithmEnum::TripleDes3Key {'Triple DES 3KEY'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($SymmetricKeyEncryptionAlgorithmEnum::CryptographicProviderDefined) {'Cryptographic Provider'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::RC2) {'RC2'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::RC4) {'RC4'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::Des) {'DES'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::TripleDes) {'Triple DES'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::DesX) {'DESX'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::Aes128) {'AES 128'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::Aes192) {'AES 192'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::Aes256) {'AES 256'}
+				$($SymmetricKeyEncryptionAlgorithmEnum::TripleDes3Key) {'Triple DES 3KEY'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3561,21 +3561,21 @@ function Get-SynonymBaseTypeValue($SynonymBaseType) {
 	} else { 
 		Write-Output $(
 			switch ($SynonymBaseType) {
-				$SynonymBaseTypeEnum::None {'None'}
-				$SynonymBaseTypeEnum::Table {'Table'}
-				$SynonymBaseTypeEnum::View {'View'}
-				$SynonymBaseTypeEnum::SqlStoredProcedure {'Stored Procedure'}
-				$SynonymBaseTypeEnum::SqlScalarFunction {'Scalar Function'}
-				$SynonymBaseTypeEnum::SqlTableValuedFunction {'Table Valued Function'}
-				$SynonymBaseTypeEnum::SqlInlineTableValuedFunction {'Inline Table Valued Function'}
-				$SynonymBaseTypeEnum::ExtendedStoredProcedure {'Extended Stored Procedure'}
-				$SynonymBaseTypeEnum::ReplicationFilterProcedure {'Replication Filter Procedure'}
-				$SynonymBaseTypeEnum::ClrStoredProcedure {'CLR Stored Procedure'}
-				$SynonymBaseTypeEnum::ClrScalarFunction {'CLR Scalar Function'}
-				$SynonymBaseTypeEnum::ClrTableValuedFunction {'CLR Table Valued Function'}
-				$SynonymBaseTypeEnum::ClrAggregateFunction {'CLR Aggregate Function'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($SynonymBaseTypeEnum::None) {'None'}
+				$($SynonymBaseTypeEnum::Table) {'Table'}
+				$($SynonymBaseTypeEnum::View) {'View'}
+				$($SynonymBaseTypeEnum::SqlStoredProcedure) {'Stored Procedure'}
+				$($SynonymBaseTypeEnum::SqlScalarFunction) {'Scalar Function'}
+				$($SynonymBaseTypeEnum::SqlTableValuedFunction) {'Table Valued Function'}
+				$($SynonymBaseTypeEnum::SqlInlineTableValuedFunction) {'Inline Table Valued Function'}
+				$($SynonymBaseTypeEnum::ExtendedStoredProcedure) {'Extended Stored Procedure'}
+				$($SynonymBaseTypeEnum::ReplicationFilterProcedure) {'Replication Filter Procedure'}
+				$($SynonymBaseTypeEnum::ClrStoredProcedure) {'CLR Stored Procedure'}
+				$($SynonymBaseTypeEnum::ClrScalarFunction) {'CLR Scalar Function'}
+				$($SynonymBaseTypeEnum::ClrTableValuedFunction) {'CLR Table Valued Function'}
+				$($SynonymBaseTypeEnum::ClrAggregateFunction) {'CLR Aggregate Function'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3593,13 +3593,13 @@ function Get-ServiceStartModeValue($ServiceStartMode) {
 	} else { 
 		Write-Output $(
 			switch ($ServiceStartMode) {
-				$ServiceStartModeEnum::Boot {'Boot'}
-				$ServiceStartModeEnum::System {'System'}
-				$ServiceStartModeEnum::Auto {'Automatic'}
-				$ServiceStartModeEnum::Manual {'Manual'}
-				$ServiceStartModeEnum::Disabled {'Disabled'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($ServiceStartModeEnum::Boot) {'Boot'}
+				$($ServiceStartModeEnum::System) {'System'}
+				$($ServiceStartModeEnum::Auto) {'Automatic'}
+				$($ServiceStartModeEnum::Manual) {'Manual'}
+				$($ServiceStartModeEnum::Disabled) {'Disabled'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3616,19 +3616,19 @@ function Get-UserDefinedFunctionTypeValue($UserDefinedFunctionType) {
 	} else { 
 		Write-Output $(
 			switch ($UserDefinedFunctionType) {
-				$UserDefinedFunctionTypeEnum::Inline {'Inline'}
-				$UserDefinedFunctionTypeEnum::Scalar {'Scalar'}
-				$UserDefinedFunctionTypeEnum::Table {'Table'}
-				$UserDefinedFunctionTypeEnum::Unknown {'Unknown'}
+				$($UserDefinedFunctionTypeEnum::Inline) {'Inline'}
+				$($UserDefinedFunctionTypeEnum::Scalar) {'Scalar'}
+				$($UserDefinedFunctionTypeEnum::Table) {'Table'}
+				$($UserDefinedFunctionTypeEnum::Unknown) {'Unknown'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$UserDefinedFunctionTypeEnum::Inline).value__ {'Inline'}
-				(					$UserDefinedFunctionTypeEnum::Scalar).value__ {'Scalar'}
-				(					$UserDefinedFunctionTypeEnum::Table).value__ {'Table'}
-				(					$UserDefinedFunctionTypeEnum::Unknown).value__ {'Unknown'}
+				$($UserDefinedFunctionTypeEnum::Inline).value__ {'Inline'}
+				$($UserDefinedFunctionTypeEnum::Scalar).value__ {'Scalar'}
+				$($UserDefinedFunctionTypeEnum::Table).value__ {'Table'}
+				$($UserDefinedFunctionTypeEnum::Unknown).value__ {'Unknown'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3645,12 +3645,12 @@ function Get-UserDefinedTypeFormatValue($UserDefinedTypeFormat) {
 	} else { 
 		Write-Output $(
 			switch ($UserDefinedTypeFormat) {
-				$UserDefinedTypeFormatEnum::Native {'Native'}
-				$UserDefinedTypeFormatEnum::UserDefined {'User Defined'}
-				$UserDefinedTypeFormatEnum::SerializedData {'Serialized Data'}
-				$UserDefinedTypeFormatEnum::SerializedDataWithMetadata {'Serialized Data With Metadata'}
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$($UserDefinedTypeFormatEnum::Native) {'Native'}
+				$($UserDefinedTypeFormatEnum::UserDefined) {'User Defined'}
+				$($UserDefinedTypeFormatEnum::SerializedData) {'Serialized Data'}
+				$($UserDefinedTypeFormatEnum::SerializedDataWithMetadata) {'Serialized Data With Metadata'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3666,12 +3666,12 @@ function Get-UserTypeValue($UserType) {
 	} else {
 		Write-Output $(
 			switch ($UserType) {
-				$UserTypeEnum::SqlLogin {'SQL user with login'}
-				$UserTypeEnum::Certificate {'User mapped to a certificate'}
-				$UserTypeEnum::AsymmetricKey {'User mapped to an asymmetric key'}
-				$UserTypeEnum::NoLogin {'SQL user without login'}
-				$null {$null} #$null {[String]$null}
-				default { 'Unknown' } 
+				$($UserTypeEnum::SqlLogin) {'SQL user with login'}
+				$($UserTypeEnum::Certificate) {'User mapped to a certificate'}
+				$($UserTypeEnum::AsymmetricKey) {'User mapped to an asymmetric key'}
+				$($UserTypeEnum::NoLogin) {'SQL user without login'}
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3688,17 +3688,17 @@ function Get-XmlDocumentConstraintValue($XmlDocumentConstraint) {
 	} else { 
 		Write-Output $(
 			switch ($XmlDocumentConstraint) {
-				$XmlDocumentConstraintEnum::Default {'Default'}
-				$XmlDocumentConstraintEnum::Content {'Content'}
-				$XmlDocumentConstraintEnum::Document {'Document'}
+				$($XmlDocumentConstraintEnum::Default) {'Default'}
+				$($XmlDocumentConstraintEnum::Content) {'Content'}
+				$($XmlDocumentConstraintEnum::Document) {'Document'}
 
 				# Added the following to support bypassing SMO when retrieving database objects
-				(					$XmlDocumentConstraintEnum::Default).value__ {'Default'}
-				(					$XmlDocumentConstraintEnum::Content).value__ {'Content'}
-				(					$XmlDocumentConstraintEnum::Document).value__ {'Document'}
+				$($XmlDocumentConstraintEnum::Default).value__ {'Default'}
+				$($XmlDocumentConstraintEnum::Content).value__ {'Content'}
+				$($XmlDocumentConstraintEnum::Document).value__ {'Document'}
 
-				$null {$null} #$null {[String]$null}
-				default {'Unknown'} 
+				$null { $null }
+				default { $_.ToString() }
 			} 
 		)
 	}
@@ -3717,17 +3717,6 @@ function Get-SqlServerVersionName([int]$MajorVersion, [int]$MinorVersion) {
 	elseif (($MajorVersion -eq 6) -and ($MinorVersion -eq 0)) { '6.0' }
 	else { 'unknown '}
 }
-
-# function Get-DocumentationUrl($BaseUrl, $Version) {
-# 	$UrlVersion = $(
-# 		if (($Server.Information.Version).CompareTo($SQLServer2000) -ge 0) { '(v=SQL.80)' }
-# 		elseif (($Server.Information.Version).CompareTo($SQLServer2005) -ge 0) { '(v=SQL.90)' }
-# 		elseif (($Server.Information.Version).CompareTo($SQLServer2008) -ge 0) { '(v=SQL.100)' }
-# 		elseif (($Server.Information.Version).CompareTo($SQLServer2008R2) -ge 0) { '(v=SQL.105)' }
-# 		elseif (($Server.Information.Version).CompareTo($SQLServer2012) -ge 0) { '(v=SQL.110)' }
-# 		else { [String]::Empty }
-# 	)
-# }
 
 
 function Write-SqlServerDatabaseEngineInformationLog {
@@ -3880,13 +3869,13 @@ function Get-CheckInformation {
 						#Properties = $_.Properties	# Microsoft.SqlServer.Management.Smo.SqlPropertyCollection Properties {get;}
 						#State = $_.State	# Microsoft.SqlServer.Management.Smo.SqlSmoState State {get;}
 						#Text = $_.Text # System.String Text {get;set;}
-						
+
 						Definition = if (-not [String]::IsNullOrEmpty($_.Text)) {
 							$_.Text.Trim()
 						} else {
 							$null
 						}
-										
+
 						#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 						#UserData = $_.UserData	# System.Object UserData {get;set;}
 					} 
@@ -3937,7 +3926,7 @@ function Get-CheckInformation2 {
 							$null
 						}
 
-						
+
 						#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 						#UserData = $_.UserData	# System.Object UserData {get;set;}
 					} 
@@ -4048,7 +4037,7 @@ function Get-ColumnInformation {
 							} else {
 								$null
 							}
-							
+
 							#Urn = $_.DefaultConstraint.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 							#UserData = $_.DefaultConstraint.UserData	# System.Object UserData {get;set;}
 						} # Microsoft.SqlServer.Management.Smo.DefaultConstraint DefaultConstraint {get;}
@@ -4164,13 +4153,13 @@ function Get-ColumnInformation2 {
 								#Parent = $_.Parent	# Microsoft.SqlServer.Management.Smo.Column Parent {get;}
 								#Properties = $_.Properties	# Microsoft.SqlServer.Management.Smo.SqlPropertyCollection Properties {get;}
 								#State = $_.State	# Microsoft.SqlServer.Management.Smo.SqlSmoState State {get;}
-								
+
 								Text = if (-not [String]::IsNullOrEmpty($_.Text)) {
 									$_.Text.Trim() # System.String Text {get;set;}
 								} else {
 									$null
 								}
-								
+
 								#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 								#UserData = $_.UserData	# System.Object UserData {get;set;}
 							} # Microsoft.SqlServer.Management.Smo.DefaultConstraint DefaultConstraint {get;}
@@ -4662,7 +4651,7 @@ function Get-TriggerInformation2 {
 						TextHeader = $_.TextHeader # System.String TextHeader {get;set;}
 						TextMode = $_.TextMode # System.Boolean TextMode {get;set;}
 						#>
-						
+
 						Definition = if ($_.IsSystemObject -eq $true) {
 							# Don't include definitions for system objects
 							$null
@@ -4674,7 +4663,7 @@ function Get-TriggerInformation2 {
 							}
 						}
 
-						
+
 						Update = $_.Update # System.Boolean Update {get;set;}
 						UpdateOrder = [String](Get-AgentActivationOrderValue -ActivationOrder $_.UpdateOrder) # Microsoft.SqlServer.Management.Smo.Agent.ActivationOrder UpdateOrder {get;set;}
 						#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
@@ -7634,15 +7623,15 @@ function Get-SqlServerSecurityInformation {
 		else {
 			$null
 		}
-		
+
 
 		Write-Output (
 			New-Object -TypeName psobject -Property @{
 				Logins = @() + (
 					$Server.Logins | ForEach-Object {
-					
+
 						$LoginName = $_.Name
-					
+
 						New-Object -TypeName psobject -Property @{
 							AsymmetricKey = $_.AsymmetricKey # System.String AsymmetricKey {get;set;}
 							Certificate = $_.Certificate # System.String Certificate {get;set;}
@@ -7673,10 +7662,10 @@ function Get-SqlServerSecurityInformation {
 							#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 							#UserData = $_.UserData	# System.Object UserData {get;set;}
 							WindowsLoginAccessType = if ($_.WindowsLoginAccessType) { $_.WindowsLoginAccessType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.WindowsLoginAccessType WindowsLoginAccessType {get;}
-							
+
 							HasBlankPassword = if ($BlankPasswordLogin | Where-Object { $_.Name -ieq $LoginName }) { $true } else { $false }
 							HasNameAsPassword = if ($NameAsPasswordLogin | Where-Object { $_.Name -ieq $LoginName }) { $true } else { $false }
-							
+
 						}
 					}
 				)
@@ -8529,15 +8518,15 @@ function Get-DatabaseInformation {
 							Collation = $_.Collation # System.String Collation {get;set;}	# Duplicated in the general tab
 							RecoveryModel = if ($_.DatabaseOptions.RecoveryModel) { $_.DatabaseOptions.RecoveryModel.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.RecoveryModel RecoveryModel {get;set;}
 							CompatibilityLevel = switch ($_.CompatibilityLevel) {
-								$CompatibilityLevel::Version60 { 'SQL Server 6.0 (60)' }
-								$CompatibilityLevel::Version65 { 'SQL Server 6.5 (65)' }
-								$CompatibilityLevel::Version70 { 'SQL Server 7.0 (70)' }
-								$CompatibilityLevel::Version80 { 'SQL Server 2000 (80)' }
-								$CompatibilityLevel::Version90 { 'SQL Server 2005 (90)' }
-								$CompatibilityLevel::Version100 { 'SQL Server 2008 (100)' }
-								$CompatibilityLevel::Version110 { 'SQL Server 2012 (110)' }
+								$($CompatibilityLevel::Version60) { 'SQL Server 6.0 (60)' }
+								$($CompatibilityLevel::Version65) { 'SQL Server 6.5 (65)' }
+								$($CompatibilityLevel::Version70) { 'SQL Server 7.0 (70)' }
+								$($CompatibilityLevel::Version80) { 'SQL Server 2000 (80)' }
+								$($CompatibilityLevel::Version90) { 'SQL Server 2005 (90)' }
+								$($CompatibilityLevel::Version100) { 'SQL Server 2008 (100)' }
+								$($CompatibilityLevel::Version110) { 'SQL Server 2012 (110)' }
 								$null { 'Unknown' }
-								default { $_.CompatibilityLevel.ToString() }
+								default { $_.ToString() }
 							} # Microsoft.SqlServer.Management.Smo.CompatibilityLevel CompatibilityLevel {get;set;}
 							ContainmentType = if ((($Server.Information.Version).CompareTo($SQLServer2012) -ge 0) -and ($_.ContainmentType)) { $_.ContainmentType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.ContainmentType ContainmentType {get;set;}
 							OtherOptions = New-Object -TypeName psobject -Property @{
@@ -8667,7 +8656,7 @@ function Get-DatabaseInformation {
 											$_.ObjectSchema -ine 'sys' -and
 											$_.ObjectSchema -ine 'INFORMATION_SCHEMA'
 										)
-									} | ForEach-Object {									
+									} | ForEach-Object { 
 										New-Object -TypeName psobject -Property @{
 											ColumnName = $_.ColumnName # System.String ColumnName {get;}
 											Grantee = $_.Grantee # System.String Grantee {get;}
@@ -8681,7 +8670,7 @@ function Get-DatabaseInformation {
 											PermissionState = [String](Get-PermissionStateValue -PermissionState $_.PermissionState) # Microsoft.SqlServer.Management.Smo.PermissionState PermissionState {get;}
 											PermissionType = if ($_.PermissionType) { $_.PermissionType.ToString() } else { $null } # Microsoft.SqlServer.Management.Smo.ObjectPermissionSet PermissionType {get;}
 										}
-									}								
+									} 
 								}
 							)
 						} else {
@@ -9401,7 +9390,7 @@ function Get-DatabaseInformation {
 												$null
 											}
 										}
-										
+
 										#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 										#UserData = $_.UserData	# System.Object UserData {get;set;}
 									}
@@ -9590,7 +9579,7 @@ function Get-DatabaseInformation {
 												$null
 											}
 										}
-										
+
 										#Events = $_.Events	# Microsoft.SqlServer.Management.Smo.UserDefinedFunctionEvents Events {get;}
 										#Parent = $_.Parent	# Microsoft.SqlServer.Management.Smo.Database Parent {get;set;}
 										#Properties = $_.Properties	# Microsoft.SqlServer.Management.Smo.SqlPropertyCollection Properties {get;}
@@ -9970,7 +9959,7 @@ function Get-DatabaseInformation {
 											} else {
 												$null
 											}
-											
+
 											#Urn = $_.Urn	# Microsoft.SqlServer.Management.Sdk.Sfc.Urn Urn {get;}
 											#UserData = $_.UserData	# System.Object UserData {get;set;}
 										}
@@ -11404,7 +11393,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.Service = Get-SqlServerServiceInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server service information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server service information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11430,7 +11420,8 @@ function Get-SqlServerDatabaseEngineInformation {
 
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server configuration information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server configuration information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11452,17 +11443,10 @@ function Get-SqlServerDatabaseEngineInformation {
 					}
 
 					$ServerInformation.Server.Databases += Get-DatabaseInformation @ParameterHash
-
-					<#
-					if ($IncludeDatabaseObjectInformation -eq $true) {
-						$ServerInformation.Server.Databases += Get-DatabaseInformation -Server $Server -IncludeObjectInformation
-					} else {
-						$ServerInformation.Server.Databases += Get-DatabaseInformation -Server $Server
-					}
-					#>
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Database information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Database information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11478,7 +11462,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.Security = Get-SqlServerSecurityInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server security information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server security information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11495,7 +11480,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.ServerObjects.Endpoints += Get-EndPointInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Endpoint information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Endpoint information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11508,7 +11494,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.ServerObjects.LinkedServers += Get-LinkedServerInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server linked server information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server linked server information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion 
@@ -11521,7 +11508,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.ServerObjects.StartupProcedures += Get-StartupProcedureInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server startup procedure information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server startup procedure information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11534,7 +11522,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.ServerObjects.Triggers += Get-ServerTriggerInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server Trigger information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Server Trigger information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion 
@@ -11551,7 +11540,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.Management.ResourceGovernor = Get-ResourceGovernorInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Resource Governor information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Resource Governor information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11564,7 +11554,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.Management.SQLTrace += Get-SQLTraceInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Trace information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Trace information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11577,7 +11568,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.Management.TraceFlags += Get-TraceFlagInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Trace Flag information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Trace Flag information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11590,7 +11582,8 @@ function Get-SqlServerDatabaseEngineInformation {
 					$ServerInformation.Server.Management.DatabaseMail = Get-DatabaseMailInformation -Server $Server
 				}
 				catch {
-					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Database Mail information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+					$ErrorRecord = $_.Exception.ErrorRecord
+					Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering Database Mail information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 				}
 				#endregion
@@ -11613,7 +11606,8 @@ function Get-SqlServerDatabaseEngineInformation {
 						$ServerInformation.Agent.Service = Get-SqlAgentServiceInformation -JobServer $Server.JobServer
 					}
 					catch {
-						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent service information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+						$ErrorRecord = $_.Exception.ErrorRecord
+						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent service information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 						if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 					}
 					#endregion
@@ -11629,7 +11623,8 @@ function Get-SqlServerDatabaseEngineInformation {
 						$ServerInformation.Agent.Configuration = Get-SqlAgentConfigurationInformation -JobServer $Server.JobServer
 					}
 					catch {
-						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent configuration information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+						$ErrorRecord = $_.Exception.ErrorRecord
+						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent configuration information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 						if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 					}
 					#endregion
@@ -11645,7 +11640,8 @@ function Get-SqlServerDatabaseEngineInformation {
 						$ServerInformation.Agent.Jobs += Get-SqlAgentJobInformation -JobServer $Server.JobServer
 					}
 					catch {
-						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent job information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+						$ErrorRecord = $_.Exception.ErrorRecord
+						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent job information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 						if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 					}
 					#endregion
@@ -11669,7 +11665,8 @@ function Get-SqlServerDatabaseEngineInformation {
 						} 
 					}
 					catch {
-						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent alert information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+						$ErrorRecord = $_.Exception.ErrorRecord
+						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent alert information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 						if (++$ErrorCount -ge $StopAtErrorCount) { Throw } 
 					}
 					#endregion
@@ -11685,20 +11682,18 @@ function Get-SqlServerDatabaseEngineInformation {
 						$ServerInformation.Agent.Operators += Get-SqlAgentOperatorInformation -JobServer $Server.JobServer
 					}
 					catch {
-						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent operator information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+						$ErrorRecord = $_.Exception.ErrorRecord
+						Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering SQL Agent operator information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 						if (++$ErrorCount -ge $StopAtErrorCount) { Throw }
 					}
 					#endregion
 
 				}
-
-				#}
 			}
 		}
 		catch {
-			# Nothing to do here for now...
-			# 			$ServerInformation.ScanErrorCount++
-			# 			Write-SqlServerDatabaseEngineInformationLog -Message "Some kind of error occured while gathering information from $InstanceName" -MessageLevel Normal
+			# If we hit this point we've reached the max error threshold
+			Write-SqlServerDatabaseEngineInformationLog -Message "[$InstanceName] Error gathering instance information - max error threshold reached ($StopAtErrorCount)" -MessageLevel Warning
 		}
 		finally {
 			# Record the number of scan errors
@@ -11726,6 +11721,7 @@ function Get-SqlServerDatabaseEngineInformation {
 # Load SMO assembly, and if we're running SQL 2008 DLLs or higher load the SMOExtended and SQLWMIManagement libraries
 [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO') | ForEach-Object {
 	$SmoMajorVersion = $_.GetName().Version.Major
+	[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SQLEnum') | Out-Null
 	if ($SmoMajorVersion -ge 10) {
 		[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMOExtended') | Out-Null
 		[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SQLWMIManagement') | Out-Null

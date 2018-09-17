@@ -2052,7 +2052,8 @@ function Get-DesktopSessionInformation([string]$Computer) {
 			}
 		}
 		catch {
-			Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about logged on users: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			$ErrorRecord = $_.Exception.ErrorRecord
+			Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about logged on users: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 			Write-WindowsMachineInformationLog -Message "[$ComputerName] Reverting to Win32_Process to determine logged on users" -MessageLevel Warning
 			$RDSessionSuccess = $false
 			$DesktopSession = @()
@@ -3790,7 +3791,8 @@ function Get-WindowsMachineInformation {
 					$MachineInformation.OperatingSystem.Settings.ComputerSystem = Get-SystemInformation -Computer $ComputerName
 				} 
 				catch {
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering computer system information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+                    $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering computer system information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw }
 				}
 			}
@@ -3802,8 +3804,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering computer system product information" -MessageLevel Verbose
 				$MachineInformation.OperatingSystem.Settings.ComputerSystemProduct = Get-ComputerSystemProductInformation -Computer $ComputerName
 			}
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering computer system product information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering computer system product information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 			}
 			#endregion
@@ -3815,8 +3818,9 @@ function Get-WindowsMachineInformation {
 				$MachineInformation.OperatingSystem.Settings.OperatingSystem = Get-OSInfo -Computer $ComputerName
 				$OSVersion = [System.Version]$MachineInformation.OperatingSystem.Settings.OperatingSystem.Version
 			} 
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering OS information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering OS information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw }
 			}
 			#endregion
@@ -3827,8 +3831,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering time zone" -MessageLevel Verbose
 				$MachineInformation.OperatingSystem.Desktop.TimeZone = Get-TimeZoneInformation -Computer $ComputerName 
 			} 
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering time zone: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering time zone: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw }
 			}
 			#endregion
@@ -3839,8 +3844,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering pagefile information" -MessageLevel Verbose
 				$MachineInformation.OperatingSystem.PageFile = Get-PagefileInformation -Computer $ComputerName -OSVersion $OSVersion 
 			} 
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering pagefile information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering pagefile information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw }
 			}
 			#endregion
@@ -3851,8 +3857,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering network adapter configuration" -MessageLevel Verbose
 				$MachineInformation.Hardware.NetworkAdapter = Get-NetworkAdapterConfig -Computer $ComputerName 
 			} 
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering network adapter configuration: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering network adapter configuration: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 			}
 			#endregion
@@ -3864,7 +3871,8 @@ function Get-WindowsMachineInformation {
 				$MachineInformation.Hardware.MotherboardControllerAndPort.PhysicalMemory = Get-PhysicalMemoryInformation -Computer $ComputerName 
 			}
 			catch {
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about physical memory: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about physical memory: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 			}
 			#endregion
@@ -3875,8 +3883,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering processor information" -MessageLevel Verbose
 				$MachineInformation.Hardware.MotherboardControllerAndPort.Processor = Get-ProcessorInformation -Computer $ComputerName -OSVersion $OSVersion
 			}
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering processor information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering processor information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 			}
 			#endregion
@@ -3887,8 +3896,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering system enclosure information" -MessageLevel Verbose
 				$MachineInformation.Hardware.MotherboardControllerAndPort.SystemEnclosure = Get-SystemEnclosureInformation -Computer $ComputerName
 			}
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering system enclosure information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering system enclosure information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 			}
 			#endregion
@@ -3899,8 +3909,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering CD-ROM Information" -MessageLevel Verbose
 				$MachineInformation.Hardware.Storage.CDROMDrive = Get-CDROMInformation -Computer $ComputerName 
 			} 
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering CD-ROM Information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering CD-ROM Information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 			}
 			#endregion
@@ -3911,8 +3922,9 @@ function Get-WindowsMachineInformation {
 				Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering disk information" -MessageLevel Verbose
 				$MachineInformation.Hardware.Storage.DiskDrive = Get-DiskInformation -Computer $ComputerName -OSVersion $OSVersion
 			}
-			catch { 
-				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering disk information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+			catch {
+                $ErrorRecord = $_.Exception.ErrorRecord
+				Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering disk information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 				if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 			}
 			#endregion
@@ -3935,8 +3947,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering BIOS information" -MessageLevel Verbose
 					$MachineInformation.Hardware.MotherboardControllerAndPort.BIOS = Get-BIOSInfo -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering BIOS information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering BIOS information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -3950,7 +3963,8 @@ function Get-WindowsMachineInformation {
 					$MachineInformation.OperatingSystem.Users.LocalGroups = Get-LocalGroupsInformation -Computer $ComputerName -OSVersion $OSVersion
 				}
 				catch {
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering local groups and group members: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering local groups and group members: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -3963,8 +3977,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering local users" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Users.LocalUsers = Get-UserAccountInformation -Computer $ComputerName -OSVersion $OSVersion
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering local users: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering local users: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -3977,8 +3992,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering information about logged on users" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Users.DesktopSessions = Get-DesktopSessionInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about logged on users: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about logged on users: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			} 
@@ -3998,8 +4014,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering IPv4 Route information" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Network.IPV4RouteTable = Get-IpRouteInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering IPv4 Route information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering IPv4 Route information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4012,8 +4029,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering event log settings" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.EventLog = Get-EventLogSettings -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering event log settings: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering event log settings: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4030,8 +4048,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering information about power plans" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Settings.PowerPlan = Get-PowerPlanInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about power plans: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about power plans: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4044,8 +4063,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering printer information" -MessageLevel Verbose
 					$MachineInformation.Hardware.Printer = Get-PrinterInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering printer information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering printer information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4058,8 +4078,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering process information" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.RunningProcesses = Get-ProcessInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering process information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering process information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4072,8 +4093,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering registry size information" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Registry = Get-RegistrySizeInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering registry size information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering registry size information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw }
 				}
 			}
@@ -4086,8 +4108,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering information about services" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Services = Get-ServicesInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about services: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about services: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4100,8 +4123,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering information about shares" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Shares = Get-ShareInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about shares: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about shares: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4115,8 +4139,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering Sound Device information" -MessageLevel Verbose
 					$MachineInformation.Hardware.MotherboardControllerAndPort.SoundDevice = Get-SoundDeviceInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering Sound Device information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering Sound Device information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 				#endregion
@@ -4127,8 +4152,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering TapeDrive information" -MessageLevel Verbose
 					$MachineInformation.Hardware.Storage.TapeDrive = Get-TapeDriveInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering TapeDrive information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering TapeDrive information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 				#endregion
@@ -4139,8 +4165,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering Video Controller information" -MessageLevel Verbose
 					$MachineInformation.Hardware.VideoAndMonitor.VideoController = Get-VideoControllerInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering Video Controller information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering Video Controller information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 				#endregion
@@ -4154,8 +4181,9 @@ function Get-WindowsMachineInformation {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering Startup Commands information" -MessageLevel Verbose
 					$MachineInformation.OperatingSystem.Settings.StartupCommands = Get-StartupCommandInformation -Computer $ComputerName 
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering Startup Commands information: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering Startup Commands information: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4176,23 +4204,21 @@ function Get-WindowsMachineInformation {
 			if ($AdditionalData -icontains 'InstalledApplications') {
 				try { 
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering application information from WMI" -MessageLevel Verbose
-					Get-ApplicationInformationFromWMI -Computer $ComputerName -OSVersion $OSVersion | ForEach-Object {
-						$MachineInformation.Software.InstalledApplications += $_
-					}
+					$MachineInformation.Software.InstalledApplications += Get-ApplicationInformationFromWMI -Computer $ComputerName -OSVersion $OSVersion
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering application information from WMI: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering application information from WMI: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 
 				try {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering application information from registry" -MessageLevel Verbose
-					Get-ApplicationInformationFromRegistry -RegistryProvider $StdRegProv | ForEach-Object {
-						$MachineInformation.Software.InstalledApplications += $_
-					}
+					$MachineInformation.Software.InstalledApplications += Get-ApplicationInformationFromRegistry -RegistryProvider $StdRegProv
 				}
-				catch { 
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering application information from registry: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+				catch {
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering application information from registry: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 			}
@@ -4204,17 +4230,21 @@ function Get-WindowsMachineInformation {
 			if ($AdditionalData -icontains 'InstalledPatches') { 
 				try {
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering information about patches from WMI" -MessageLevel Verbose
-					$MachineInformation.Software.Patches = Get-PatchInformationFromWMI -Computer $ComputerName }
+					$MachineInformation.Software.Patches = Get-PatchInformationFromWMI -Computer $ComputerName 
+				}
 				catch {
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about patches from WMI: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about patches from WMI: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				}
 
 				try { 
 					Write-WindowsMachineInformationLog -Message "[$ComputerName] Gathering information about patches from registry" -MessageLevel Verbose
-					$MachineInformation.Software.Patches += Get-PatchInformationFromRegistry -RegistryProvider $StdRegProv }
+					$MachineInformation.Software.Patches += Get-PatchInformationFromRegistry -RegistryProvider $StdRegProv 
+				}
 				catch {
-					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about patches from registry: $($_.Exception.Message) ($([System.IO.Path]::GetFileName($_.InvocationInfo.ScriptName)) line $($_.InvocationInfo.ScriptLineNumber), char $($_.InvocationInfo.OffsetInLine))" -MessageLevel Warning
+	                $ErrorRecord = $_.Exception.ErrorRecord
+					Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering information about patches from registry: $($ErrorRecord.Exception.Message) ($([System.IO.Path]::GetFileName($ErrorRecord.InvocationInfo.ScriptName)) line $($ErrorRecord.InvocationInfo.ScriptLineNumber), char $($ErrorRecord.InvocationInfo.OffsetInLine))" -MessageLevel Warning
 					if (++$ErrorCount -ge $StopAtErrorCount) { throw } 
 				} 
 			}
@@ -4239,7 +4269,8 @@ function Get-WindowsMachineInformation {
 
 		}
 		catch {
-			# Nothing to do here for now...
+			# If we hit this point we've reached the max error threshold
+			Write-WindowsMachineInformationLog -Message "[$ComputerName] Error gathering machine information - max error threshold reached ($StopAtErrorCount)" -MessageLevel Warning
 		}
 		finally {
 

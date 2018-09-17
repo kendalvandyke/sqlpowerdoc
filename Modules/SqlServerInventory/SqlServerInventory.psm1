@@ -35,7 +35,7 @@ New-Variable -Name XlNumFmtNumberS3 -Value '#,##0.000;@' -Scope Script -Option C
 ######################
 # SCRIPT VARIABLES
 ######################
-New-Object -TypeName System.Version -ArgumentList '1.0.0.0' | New-Variable -Name ModuleVersion -Scope Script -Option Constant -Visibility Private
+New-Object -TypeName System.Version -ArgumentList '1.0.1.0' | New-Variable -Name ModuleVersion -Scope Script -Option Constant -Visibility Private
 
 New-Variable -Name LogQueue -Value $null -Scope Script -Visibility Private
 
@@ -478,7 +478,7 @@ function Export-SqlServerInventoryToGzClixml {
 		$Inventory = $SqlServerInventory.psobject.Copy()
 		#$Inventory.DatabaseServer = $SqlServerInventory.DatabaseServer.psobject.Copy()
 
-		$Inventory.DatabaseServer = $Inventory.DatabaseServer | ForEach-Object {
+		$Inventory.DatabaseServer = $Inventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 			$DatabaseServer = $_.psobject.Copy()
 
@@ -630,9 +630,9 @@ function Import-SqlServerInventoryFromGzClixml {
 				ConvertFrom-GzCliXml -InputObject $([System.Convert]::FromBase64String($_))
 			}
 
-			$Inventory.DatabaseServer | ForEach-Object {
+			$Inventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					if (
 						$_.Properties.Permissions.Length -gt 0 -and
@@ -770,8 +770,14 @@ function Import-SqlServerInventoryFromGzClixml {
 			# This reference was removed by ConvertTo-GzSqlServerInventory
 			foreach ($Machine in ($Inventory.WindowsInventory.Machine)) {
 				$Inventory.Service | Where-Object { 
-					$_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -and 
-					$_.ServiceTypeName -ieq 'sql server'
+                    $_.ServiceTypeName -ieq 'sql server' -and
+					(
+                        $_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -or
+                        (
+                            $_.ComputerName.StartsWith($Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName, [System.StringComparison]::InvariantCultureIgnoreCase) -and
+                            $($Machine.Hardware.NetworkAdapter | ForEach-Object { $_.IPAddress }) -icontains $_.ComputerIpAddress
+                        )
+                    )
 				} | ForEach-Object {
 					$InventoryServiceId = $_.InventoryServiceId
 					$Inventory.DatabaseServer | Where-Object { $_.InventoryServiceId -ieq $InventoryServiceId } | ForEach-Object {
@@ -951,67 +957,52 @@ function Get-SqlServerInventory {
 		Export-SqlServerInventoryDatabaseEngineConfigToExcel
 
 #>
-	[cmdletBinding(DefaultParametersetName='computername_WindowsAuthentication')]
+	[cmdletBinding(DefaultParametersetName='computername')]
 	param(
-		[Parameter(Mandatory=$true, ParameterSetName='dns_SQLAuthentication', HelpMessage='DNS Server(s)')]
-		[Parameter(Mandatory=$true, ParameterSetName='dns_WindowsAuthentication', HelpMessage='DNS Server(s)')]
+		[Parameter(Mandatory=$true, ParameterSetName='dns', HelpMessage='DNS Server(s)')]
 		[alias('dns')]
 		[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^auto$|^automatic$')]
 		[string[]]
 		$DnsServer = 'automatic'
 		,
-		[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication', HelpMessage='DNS Domain Name')] 
-		[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication', HelpMessage='DNS Domain Name')] 
+		[Parameter(Mandatory=$false, ParameterSetName='dns', HelpMessage='DNS Domain Name')]
 		[alias('domain')]
 		[string]
 		$DnsDomain = 'automatic'
 		,
-		[Parameter(Mandatory=$true, ParameterSetName='subnet_SQLAuthentication', HelpMessage='Subnet (in CIDR notation)')] 
-		[Parameter(Mandatory=$true, ParameterSetName='subnet_WindowsAuthentication', HelpMessage='Subnet (in CIDR notation)')] 
+		[Parameter(Mandatory=$true, ParameterSetName='subnet', HelpMessage='Subnet (in CIDR notation)')]
 		[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]\d{1,2}$|^auto$|^automatic$')]
 		[string[]]
 		$Subnet = 'automatic'
 		,
-		[Parameter(Mandatory=$true, ParameterSetName='computername_SQLAuthentication', HelpMessage='Computer Name(s)')] 
-		[Parameter(Mandatory=$true, ParameterSetName='computername_WindowsAuthentication', HelpMessage='Computer Name(s)')] 
+		[Parameter(Mandatory=$true, ParameterSetName='computername', HelpMessage='Computer Name(s)')] 
 		[alias('computer')]
 		[string[]]
 		$ComputerName
 		,
-		[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication')]
-		[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication')]
-		[Parameter(Mandatory=$false, ParameterSetName='subnet_SQLAuthentication')]
-		[Parameter(Mandatory=$false, ParameterSetName='subnet_WindowsAuthentication')]
+		[Parameter(Mandatory=$false, ParameterSetName='dns')]
+		[Parameter(Mandatory=$false, ParameterSetName='subnet')]
 		[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]\d{1,2}$')]
 		[string[]]
 		$ExcludeSubnet
 		,
-		[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication')]
-		[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication')]
+		[Parameter(Mandatory=$false, ParameterSetName='dns')]
 		[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]\d{1,2}$')]
 		[string[]]
 		$LimitSubnet
 		,
-		[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication')]
-		[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication')]
-		[Parameter(Mandatory=$false, ParameterSetName='subnet_SQLAuthentication')]
-		[Parameter(Mandatory=$false, ParameterSetName='subnet_WindowsAuthentication')]
+		[Parameter(Mandatory=$false, ParameterSetName='dns')]
+		[Parameter(Mandatory=$false, ParameterSetName='subnet')]
 		[string[]]
 		$ExcludeComputerName
 		,
-		[Parameter(Mandatory=$true, ParameterSetName='dns_SQLAuthentication') ]
-		[Parameter(Mandatory=$true, ParameterSetName='subnet_SQLAuthentication') ]
-		[Parameter(Mandatory=$true, ParameterSetName='computername_SQLAuthentication') ]
-		[ValidateNotNull()]
+		[Parameter(Mandatory=$false)] 
 		[System.String]
-		$Username
+		$Username = $null
 		,
-		[Parameter(Mandatory=$true, ParameterSetName='dns_SQLAuthentication') ]
-		[Parameter(Mandatory=$true, ParameterSetName='subnet_SQLAuthentication') ]
-		[Parameter(Mandatory=$true, ParameterSetName='computername_SQLAuthentication') ]
-		[ValidateNotNull()]
+		[Parameter(Mandatory=$false)] 
 		[System.String]
-		$Password
+		$Password = $null
 		,
 		[Parameter(Mandatory=$false)] 
 		[ValidateRange(1,100)]
@@ -1083,8 +1074,43 @@ function Get-SqlServerInventory {
 		# Fallback in case value isn't supplied or somehow missing from the environment variables
 		if (-not $MaxConcurrencyThrottle) { $MaxConcurrencyThrottle = 1 }
 
+
 		Write-SqlServerInventoryLog -Message "Start Function: $($MyInvocation.InvocationName)" -MessageLevel Debug
 		Write-Progress -Activity 'SQL Server Inventory' -PercentComplete 0 -Status 'Discovering SQL Server Instances' -Id $MasterProgressId -ParentId $ParentProgressId
+
+		Write-SqlServerInventoryLog -Message 'Beginning SQL Server Inventory' -MessageLevel Information
+
+		switch ($PsCmdlet.ParameterSetName) {
+			'dns' {
+				Write-SqlServerInventoryLog -Message "`t-DnsServer: $([String]::Join(',',$DnsServer))" -MessageLevel Information
+				Write-SqlServerInventoryLog -Message "`t-DnsDomain: $DnsDomain" -MessageLevel Information
+				if ($ExcludeSubnet) { Write-SqlServerInventoryLog -Message "`t-ExcludeSubnet: $([String]::Join(',',$ExcludeSubnet))" -MessageLevel Information }
+				if ($LimitSubnet) { Write-SqlServerInventoryLog -Message "`t-LimitSubnet: $([String]::Join(',',$LimitSubnet))" -MessageLevel Information }
+				if ($ExcludeComputerName) { Write-SqlServerInventoryLog -Message "`t-ExcludeComputerName: $([String]::Join(',',$ExcludeComputerName))" -MessageLevel Information }
+			}
+			'subnet' {
+				Write-SqlServerInventoryLog -Message "`t-Subnet: $([String]::Join(',',$Subnet))" -MessageLevel Information
+				if ($ExcludeSubnet) { Write-SqlServerInventoryLog -Message "`t-ExcludeSubnet: $([String]::Join(',',$ExcludeSubnet))" -MessageLevel Information }
+				if ($ExcludeComputerName) { Write-SqlServerInventoryLog -Message "`t-ExcludeComputerName: $([String]::Join(',',$ExcludeComputerName))" -MessageLevel Information }
+			}
+			'computername' {
+				Write-SqlServerInventoryLog -Message "`t-ComputerName: $([String]::Join(',',$ComputerName))" -MessageLevel Information
+			}
+		}
+		if (-not [String]::IsNullOrEmpty($Username)) {
+			Write-SqlServerInventoryLog -Message "`t-Username: ###########" -MessageLevel Information
+		}
+		if (-not [String]::IsNullOrEmpty($Password)) {
+			Write-SqlServerInventoryLog -Message "`t-Password: ###########" -MessageLevel Information
+		}
+		Write-SqlServerInventoryLog -Message "`t-MaxConcurrencyThrottle: $MaxConcurrencyThrottle" -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "`t-PrivateOnly: $PrivateOnly" -MessageLevel Information
+		if ($ParentProgressId) { Write-SqlServerInventoryLog -Message "`t-ParentProgressId: $ParentProgressId" -MessageLevel Information }
+		Write-SqlServerInventoryLog -Message "`t-IncludeDatabaseObjectPermissions: $IncludeDatabaseObjectPermissions" -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "`t-IncludeDatabaseObjectInformation: $IncludeDatabaseObjectInformation" -MessageLevel Information
+		Write-SqlServerInventoryLog -Message "`t-IncludeDatabaseSystemObjects: $IncludeDatabaseSystemObjects" -MessageLevel Information
+
+
 
 		# Build command for splatting
 		$ParameterHash = @{
@@ -1094,7 +1120,7 @@ function Get-SqlServerInventory {
 		}
 
 		switch ($PsCmdlet.ParameterSetName) {
-			'dns_SQLAuthentication' {
+			'dns' {
 				$ParameterHash.Add('DnsServer',$DnsServer)
 				$ParameterHash.Add('DnsDomain',$DnsDomain)
 				if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
@@ -1102,35 +1128,17 @@ function Get-SqlServerInventory {
 				if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
 				$TotalScanCount = 1
 			}
-			'dns_WindowsAuthentication' {
-				$ParameterHash.Add('DnsServer',$DnsServer)
-				$ParameterHash.Add('DnsDomain',$DnsDomain)
-				if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
-				if ($LimitSubnet) { $ParameterHash.Add('IncludeSubnet',$LimitSubnet) }
-				if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
-				$TotalScanCount = 1
-			}
-			'subnet_SQLAuthentication' {
+			'subnet' {
 				$ParameterHash.Add('Subnet',$Subnet)
 				if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
 				if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
 				$TotalScanCount = 1
 			}
-			'subnet_WindowsAuthentication' {
-				$ParameterHash.Add('Subnet',$Subnet)
-				if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
-				if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
-				$TotalScanCount = 1
-			}
-			'computername_SQLAuthentication' {
+			'computername' {
 				# Don't bother with Windows Azure SQL Databases
 				# As of 2013/03/27 there is no way to discover WASD services with SMO & WMI
 				# We'll just assume it's running and try to connect later
 				#$ParameterHash.Add('ComputerName',$ComputerName)
-				$ParameterHash.Add('ComputerName',$($ComputerName | Where-Object { $_ -inotlike '*.database.windows.net' }))
-				$TotalScanCount = $($ParameterHash.ComputerName | Measure-Object).Count
-			}
-			'computername_WindowsAuthentication' {
 				$ParameterHash.Add('ComputerName',$($ComputerName | Where-Object { $_ -inotlike '*.database.windows.net' }))
 				$TotalScanCount = $($ParameterHash.ComputerName | Measure-Object).Count
 			}
@@ -1149,7 +1157,7 @@ function Get-SqlServerInventory {
 		}
 
 		# Add Windows Azure SQL Databases to $TotalScanCount
-		if ($PsCmdlet.ParameterSetName -ieq 'computername_SQLAuthentication') {
+		if ($PsCmdlet.ParameterSetName -ieq 'computername') {
 			$TotalScanCount += $($ComputerName | Where-Object { $_ -ilike '*.database.windows.net' } | Select-Object -Unique | Measure-Object).Count
 		}
 
@@ -1224,22 +1232,11 @@ function Get-SqlServerInventory {
 				IncludeDatabaseObjectInformation = $IncludeDatabaseObjectInformation
 				IncludeDatabaseSystemObjects = $IncludeDatabaseSystemObjects
 			}
-
-			switch ($PsCmdlet.ParameterSetName) {
-				'dns_SQLAuthentication' {
-					$ParameterHash.Add('Username',$Username)
-					$ParameterHash.Add('Password',$Password)
-				}
-				'subnet_SQLAuthentication' {
-					$ParameterHash.Add('Username',$Username)
-					$ParameterHash.Add('Password',$Password)
-				}
-				'computername_SQLAuthentication' {
-					$ParameterHash.Add('Username',$Username)
-					$ParameterHash.Add('Password',$Password)
-				}
+			
+			if (-not [String]::IsNullOrEmpty($Username)) {
+				$ParameterHash.Add('Username',$Username)
+				$ParameterHash.Add('Password',$Password)
 			}
-
 
 			#Create the PowerShell instance and supply the scriptblock with the other parameters
 			$PowerShell = [System.Management.Automation.PowerShell]::Create().AddScript($ScriptBlock)
@@ -1263,7 +1260,7 @@ function Get-SqlServerInventory {
 
 
 		# Scan for Windows Azure SQL Database
-		if ($PsCmdlet.ParameterSetName -ieq 'computername_SQLAuthentication') {
+		if ($PsCmdlet.ParameterSetName -ieq 'computername') {
 
 			# Scan for Windows Azure SQL Database
 			$ComputerName | Where-Object { $_ -ilike '*.database.windows.net' } | Select-Object -Unique | ForEach-Object {
@@ -1386,16 +1383,22 @@ function Get-SqlServerInventory {
 					ComputerName = @($Inventory.Service | Select-Object -Property ComputerName -Unique | ForEach-Object { $_.ComputerName })
 					AdditionalData = @('All')
 				}
-				
+
 				$Inventory.WindowsInventory = Get-WindowsInventory @ParameterHash 
 
 			}
 
 			# Create a reference from each DatabaseServer to its Windows machine
 			foreach ($Machine in ($Inventory.WindowsInventory.Machine)) {
-				$Inventory.Service | Where-Object { 
-					$_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -and 
-					$_.ServiceTypeName -ieq 'sql server'
+				$Inventory.Service | Where-Object {
+                    $_.ServiceTypeName -ieq 'sql server' -and
+					(
+                        $_.ComputerName -ieq $Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName -or
+                        (
+                            $_.ComputerName.StartsWith($Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName, [System.StringComparison]::InvariantCultureIgnoreCase) -and
+                            $($Machine.Hardware.NetworkAdapter | ForEach-Object { $_.IPAddress }) -icontains $_.ComputerIpAddress
+                        )
+                    )
 				} | ForEach-Object {
 					$InventoryServiceId = $_.InventoryServiceId
 					$Inventory.DatabaseServer | Where-Object { $_.InventoryServiceId -ieq $InventoryServiceId } | ForEach-Object {
@@ -1440,6 +1443,8 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 	)
 	begin {
 		$NullDatabaseName = $null
+		New-Object -TypeName System.Version -ArgumentList '5.2' | New-Variable -Name WindowsServer2003
+		New-Object -TypeName System.Version -ArgumentList '9.0.0.0' | New-Variable -Name SQLServer2005
 	}
 	process {
 
@@ -1453,7 +1458,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 			$ServerServiceAccount = $_.Server.Service.ServiceAccount
 			$AgentServiceAccount = $_.Agent.Service.ServiceAccount
 
-			$ServerVersion = $DatabaseServer.Server.Configuration.General.Version
+			$ServerVersion = [System.Version]$DatabaseServer.Server.Configuration.General.Version
 			$HelpUrlModifier = switch -wildcard ($DatabaseServer.Server.Configuration.General.Version) {
 				'11.*' { '(v=sql.110)' } # SQL 2012
 				'10.5' { '(v=sql.105)' } # SQL 2008 R2
@@ -1752,6 +1757,9 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 
 			# Servers with Non-Default Config Values
+			# Exclude xp_cmdshell because this is checked elsewhere
+			# Exclude 'max server memory (MB)' because it's a GOOD thing if this is changed from the default
+			# 
 			#region
 			Get-ServerConfigurationItem -ServerConfigurationInformation $DatabaseServer.Server.Configuration | Where-Object {
 				(
@@ -1762,9 +1770,10 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 						'backup compression default', 'common criteria compliance enabled', 'contained database authentication',
 						'EKM provider enabled'
 						#>
-						'xp_cmdshell'
+						'xp_cmdshell', 'max server memory (MB)'
 					) -inotcontains $_.ConfigurationName
 				) -and
+				-not [String]::IsNullOrEmpty($_.ConfigurationName) -and
 				$_.RunningValue -ne $_.DefaultValue -and
 				(
 					# In some cases 'min server memory (MB)' can have a default of 0 but a running value of 16; OK to ignore this
@@ -1810,12 +1819,22 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 			# Server public Permissions
 			# VIEW ANY DATABASE is granted by default so go ahead and let this one slide
+			# CONNECT to default endpoints is also granted by default so let it slide as well
 			#region
 			$DatabaseServer.Server.Configuration.Permissions | Where-Object {
 				@('Grant','Grant With Grant') -icontains $_.PermissionState -and
 				$_.Grantee -ieq 'public' -and
-				$_.GranteeType -ieq 'Server Role' -and
-				$_.PermissionType -ine 'VIEW ANY DATABASE'
+				(
+					(
+						$_.GranteeType -ieq 'Server Role' -and
+						$_.PermissionType -ine 'VIEW ANY DATABASE'
+					) -or 
+					(
+						$_.GranteeType -ieq 'Endpoint' -and
+						$_.PermissionType -ine 'CONNECT' -and
+						@('TSQL Local Machine','TSQL Named Pipes','TSQL Default TCP','TSQL Default VIA') -inotcontains $_.ObjectName 
+					)
+				) 
 			} | ForEach-Object {
 
 				$Details = "The public server role has been granted the $($_.PermissionType) server permission. Because every server login is a member of the public server role every login will inherit this permission."
@@ -2284,7 +2303,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				-Category $CatPerformance `
 				-Description 'Lightweight Pooling Enabled' `
 				-Details $Details `
-				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/bb402857', $HelpUrlModifier, '.aspx'))) 
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms178074', $HelpUrlModifier, '.aspx'))) 
 			}
 			#endregion
 
@@ -2348,6 +2367,156 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				-Details $Details `
 				-URL 'http://support.microsoft.com/kb/2160720'
 
+			}
+			#endregion
+
+
+			# Network Packet Size Should Not Exceed 8060 Bytes
+			#region
+			if ($_.Server.Configuration.Advanced.Network.NetworkPacketSize.RunningValue -gt 8060) {
+
+				$Details = "The sp_configure option 'network packet size' is set to $($_.Server.Configuration.Advanced.Network.NetworkPacketSize.RunningValue). Values higher than 8060 may lead to an increase in the process virtual address space that is not reserved for the buffer pool."
+
+				Get-AssessmentFinding -ServerName $ServerName `
+				-DatabaseName $NullDatabaseName `
+				-Priority $HighPriority `
+				-Category $CatPerformance `
+				-Description 'Network Packet Size' `
+				-Details $Details `
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms177437', $HelpUrlModifier, '.aspx'))) 
+			}
+			#endregion
+
+
+			# Affinity Mask Overlap
+			#region
+			if (
+				$( $_.Server.Configuration.Processor.AffinityMask.RunningValue -band $_.Server.Configuration.Processor.AffinityIOMask.RunningValue) -gt 0 -or
+				(
+					@('NT AMD64', 'NT INTEL IA64') -icontains $_.Server.Configuration.General.Platform -and
+					$( $_.Server.Configuration.Processor.Affinity64Mask.RunningValue -band $_.Server.Configuration.Processor.Affinity64IOMask.RunningValue) -gt 0
+
+				)
+			) {
+
+				$Details = "Server is configured with a CPU enabled for both the affinity mask and the affinity I/O mask. This can cause the processor to be overused and slow down performance."
+
+				Get-AssessmentFinding -ServerName $ServerName `
+				-DatabaseName $NullDatabaseName `
+				-Priority $HighPriority `
+				-Category $CatPerformance `
+				-Description 'Affinity Mask Overlap' `
+				-Details $Details `
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/bb409865', $HelpUrlModifier, '.aspx'))) 
+			}
+			#endregion
+
+
+			# Password Policy Not Enforced
+			#region
+			$DatabaseServer.Server.Security.Logins | Where-Object {
+				-not [String]::IsNullOrEmpty($ServerVersion) -and
+				$ServerVersion.CompareTo($SQLServer2005) -ge 0 -and 
+				$_.LoginType -ieq 'SQL Login' -and
+				$_.PasswordPolicyEnforced -ne $true
+			} | ForEach-Object {
+
+				if (
+					-not [String]::IsNullOrEmpty($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version) -and
+					$([System.Version]$DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version).CompareTo($WindowsServer2003) -lt 0
+				) {
+					$Details = "Password policy enforcement for SQL login [$($_.Name)] is disabled, however because this instance is running on $($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Name) enabling password policy will have no effect. This means an attacker can execute a brute force attack without locking the login. Conduct a regular audit of the SQL Server error log for failed login attempts to mitigate this risk."
+				} else {
+					$Details = "Password policy enforcement for SQL login [$($_.Name)] is disabled. Unless you have it disabled for a specific and known reason, you should consider enabling password policy for this login."
+				}
+
+				Get-AssessmentFinding -ServerName $ServerName `
+				-DatabaseName $NullDatabaseName `
+				-Priority $LowPriority `
+				-Category $CatSecurity `
+				-Description 'Password Policy Not Enforced' `
+				-Details $Details `
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms161959', $HelpUrlModifier, '.aspx')))
+			}
+			#endregion
+
+
+			# Password Expiration Not Enabled
+			#region
+			$DatabaseServer.Server.Security.Logins | Where-Object {
+				-not [String]::IsNullOrEmpty($ServerVersion) -and
+				$ServerVersion.CompareTo($SQLServer2005) -ge 0 -and 
+				$_.LoginType -ieq 'SQL Login' -and
+				$_.PasswordExpirationEnabled -ne $true
+
+			} | ForEach-Object {
+
+				if (
+					-not [String]::IsNullOrEmpty($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version) -and
+					$([System.Version]$DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version).CompareTo($WindowsServer2003) -lt 0
+				) {
+					$Details = "Password expiration for SQL login [$($_.Name)] is disabled, however because this instance is running on $($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Name) enabling password expiration will have no effect. This means an attacker can execute a brute force attack without locking the login. Conduct a regular audit of the SQL Server error log for failed login attempts to mitigate this risk."
+				} else {
+					$Details = "Password expiration for SQL login [$($_.Name)] is disabled. Unless you have it disabled for a specific and known reason, you should consider enabling expiration policy for this login."
+				}
+
+				Get-AssessmentFinding -ServerName $ServerName `
+				-DatabaseName $NullDatabaseName `
+				-Priority $LowPriority `
+				-Category $CatSecurity `
+				-Description 'Password Expiration Not Enabled' `
+				-Details $Details `
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms161959', $HelpUrlModifier, '.aspx')))
+			}
+			#endregion
+
+
+			# Password Policy Not Supported
+			#region
+			$DatabaseServer.Server.Security.Logins | Where-Object {
+				-not [String]::IsNullOrEmpty($ServerVersion) -and
+				$ServerVersion.CompareTo($SQLServer2005) -ge 0 -and 
+				$_.LoginType -ieq 'SQL Login' -and
+				$_.PasswordPolicyEnforced -eq $true -and
+				-not [String]::IsNullOrEmpty($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version) -and
+				$([System.Version]$DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version).CompareTo($WindowsServer2003) -lt 0
+
+			} | ForEach-Object {
+
+				$Details = "Password policy enforcement for SQL login [$($_.Name)] is enabled, however because this instance is running on $($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Name) password policy will have no effect. This means an attacker can execute a brute force attack without locking the login. Conduct a regular audit of the SQL Server error log for failed login attempts to mitigate this risk."
+
+				Get-AssessmentFinding -ServerName $ServerName `
+				-DatabaseName $NullDatabaseName `
+				-Priority $LowPriority `
+				-Category $CatSecurity `
+				-Description 'Password Policy Not Supported' `
+				-Details $Details `
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms161959', $HelpUrlModifier, '.aspx')))
+			}
+			#endregion
+
+
+			# Password Expiration Not Supported
+			#region
+			$DatabaseServer.Server.Security.Logins | Where-Object {
+				-not [String]::IsNullOrEmpty($ServerVersion) -and
+				$ServerVersion.CompareTo($SQLServer2005) -ge 0 -and 
+				$_.LoginType -ieq 'SQL Login' -and
+				$_.PasswordExpirationEnabled -eq $true -and
+				-not [String]::IsNullOrEmpty($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version) -and
+				$([System.Version]$DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Version).CompareTo($WindowsServer2003) -lt 0
+
+			} | ForEach-Object {
+
+				$Details = "Password expiration for SQL login [$($_.Name)] is enabled, however because this instance is running on $($DatabaseServer.Machine.OperatingSystem.Settings.OperatingSystem.Name) password expiration will have no effect. This means an attacker can execute a brute force attack without locking the login. Conduct a regular audit of the SQL Server error log for failed login attempts to mitigate this risk."
+
+				Get-AssessmentFinding -ServerName $ServerName `
+				-DatabaseName $NullDatabaseName `
+				-Priority $LowPriority `
+				-Category $CatSecurity `
+				-Description 'Password Expiration Not Supported' `
+				-Details $Details `
+				-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms161959', $HelpUrlModifier, '.aspx')))
 			}
 			#endregion
 
@@ -2689,16 +2858,83 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 						$PartitionRoot = [String]::Concat($LogicalDisk.Caption, [System.IO.Path]::DirectorySeparatorChar)
 
-						# Do further analysis if any database files exist on the current drive
-						if (
-							$DatabaseServer.Server.Databases | Where-Object {
-								$_.Properties.Files.DatabaseFiles | Where-Object { 
-									$_.ID -and
-									[System.IO.Path]::GetPathRoot($_.Path) -ieq $PartitionRoot
-								}
+						$HasDatabaseFile = $false
+						$CanGrowLargerThanDriveFreeSpace = $false
+						$AllFileGrowthPotentialKB = 0
+						$AlertForLowDriveSpace = $false
+						$AssessmentPriority = $null
 
+						# Check to see if there are DB files on this drive and if they can grow larger than the remaining free drive space
+						#region
+						$DatabaseServer.Server.Databases | ForEach-Object {
+							$_.Properties.Files.DatabaseFiles | Where-Object {
+								$_.ID -and
+								[System.IO.Path]::GetPathRoot($_.Path) -ieq $PartitionRoot
 							}
-						) {
+						} | ForEach-Object {
+							$HasDatabaseFile = $true
+
+							if ($_.GrowthType -ine 'None') {
+
+								if ($_.MaxSizeKB -eq 0) {
+									$CanGrowLargerThanDriveFreeSpace = $true
+								} else {
+
+									$AllFileGrowthPotentialKB += ($_.MaxSizeKB - $_.SizeKB)
+
+									if ($AllFileGrowthPotentialKB -gt ($LogicalDisk.FreeSpaceBytes / 1KB)) {
+										$CanGrowLargerThanDriveFreeSpace = $true
+									}
+
+								}
+							}
+						}
+						#endregion
+
+						# Check free space remaining
+						#region
+						if ((($LogicalDisk.FreeSpaceBytes / $LogicalDisk.SizeBytes) * 100) -le 5) {
+							$AlertForLowDriveSpace = $true
+							$AssessmentPriority = $HighPriority
+							$FreeSpaceValue = '5%'
+						} 
+						elseif ((($LogicalDisk.FreeSpaceBytes / $LogicalDisk.SizeBytes) * 100) -le 10) {
+							$AlertForLowDriveSpace = $true
+							$AssessmentPriority = $MediumPriority
+							$FreeSpaceValue = '10%'
+						}
+						elseif ((($LogicalDisk.FreeSpaceBytes / $LogicalDisk.SizeBytes) * 100) -le 15) {
+							$AlertForLowDriveSpace = $true
+							$AssessmentPriority = $LowPriority
+							$FreeSpaceValue = '15%'
+						}
+
+						if ($AlertForLowDriveSpace -eq $true) {
+
+							if ($HasDatabaseFile -eq $true) {
+								if ($CanGrowLargerThanDriveFreeSpace -eq $true) {
+									$Details = 'Drive {0} has less than {1} free space remaining ({2:#,##0.##} MB free / {3:#,##0.##} MB total). This drive contains SQL Server files that are configured with autogrowth settings that could cause the drive to run out of space. Consider adding drive space or adjusting the autogrowth settings before the drive runs out of space.' -f $($LogicalDisk.Caption), $FreeSpaceValue, $($LogicalDisk.FreeSpaceBytes / 1MB), $($LogicalDisk.SizeBytes / 1MB)
+								} else {
+									$Details = 'Drive {0} has less than {1} free space remaining ({2:#,##0.##} MB free / {3:#,##0.##} MB total). This drive contains SQL Server files and although their autogrowth settings will not cause the drive to run out of space you should still double check this drive just to be safe.' -f $($LogicalDisk.Caption), $FreeSpaceValue, $($LogicalDisk.FreeSpaceBytes / 1MB), $($LogicalDisk.SizeBytes / 1MB)
+								}
+							} elseif ($PartitionRoot -ieq $SystemDrive) {
+								$Details = 'Drive {0} has less than {1} free space remaining ({2:#,##0.##} MB free / {3:#,##0.##} MB total). This is the system drive and if it runs out of space it could crash the entire server.' -f $($LogicalDisk.Caption), $FreeSpaceValue, $($LogicalDisk.FreeSpaceBytes / 1MB), $($LogicalDisk.SizeBytes / 1MB)
+							} else {
+								$Details = 'Drive {0} has less than {1} free space remaining ({2:#,##0.##} MB free / {3:#,##0.##} MB total). Although it doesn''t contain any database files and is not the system drive you should still have a look as it might be used for other SQL Server related tasks.' -f $($LogicalDisk.Caption), $FreeSpaceValue, $($LogicalDisk.FreeSpaceBytes / 1MB), $($LogicalDisk.SizeBytes / 1MB)
+							}
+
+							Get-AssessmentFinding -ServerName $ServerName `
+							-DatabaseName $NullDatabaseName `
+							-Priority $AssessmentPriority `
+							-Category $CatReliability `
+							-Description 'Low Drive Space' `
+							-Details $Details `
+							-URL 'http://technet.microsoft.com/en-us/library/cc966534.aspx'
+						}
+						#endregion
+
+						# Do further analysis if any database files exist on the current drive
+						if ($HasDatabaseFile -eq $true) {
 
 							# Nonaligned partitions
 							#region
@@ -2716,7 +2952,6 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 							}
 							#endregion
-
 
 							# Partition Allocation Unit Size
 							#region
@@ -2861,6 +3096,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 			$DatabaseServer.Server.Databases | ForEach-Object {
 
 				$DatabaseName = $_.Name
+				$DatabaseOwner = $_.Properties.General.Database.Owner
 
 				# DB has never had a FULL backup
 				# Exclude tempdb and databases that aren't in "normal" status
@@ -3001,14 +3237,14 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				}
 				#endregion
 
-				# Page Verification Not Optimal (all versions)
+				# Page Verification Not Optimal
 				#region
 				if (
 					$_.Name -ine 'tempdb' -and
 					$_.Properties.Options.OtherOptions.Recovery.PageVerify -ine 'CHECKSUM'
 				) {
 
-					$Details = "Database has $($_.Properties.Options.OtherOptions.Recovery.PageVerify) for page verification.  SQL Server may have a harder time recognizing and recovering from storage corruption.  Consider using CHECKSUM instead."
+					$Details = "Database has $($_.Properties.Options.OtherOptions.Recovery.PageVerify) for page verification. SQL Server may have a harder time recognizing and recovering from storage corruption. Consider using CHECKSUM instead."
 
 					Get-AssessmentFinding -ServerName $ServerName `
 					-DatabaseName $DatabaseName `
@@ -3632,7 +3868,11 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				# Guest Permissions on User Databases
 				#region
 				if (
-					$_.Properties.General.Database.IsSystemObject -ne $true -and
+					(
+						$_.Properties.General.Database.IsSystemObject -ne $true -or
+						$DatabaseName -ieq 'model'
+					) -and
+					$_.Properties.General.Database.Status -ieq 'normal' -and
 					(
 						$_.Properties.Permissions | Where-Object {
 							@('Grant','Grant With Grant') -icontains $_.PermissionState -and
@@ -3651,7 +3891,7 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					-Category $CatSecurity `
 					-Description 'Guest Permissions on User Database' `
 					-Details $Details `
-					-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/bb402861', $HelpUrlModifier, '.aspx')))
+					-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/bb283235', $HelpUrlModifier, '.aspx')))
 
 				}
 				#endregion
@@ -3695,7 +3935,6 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 					}
 					#endregion
 
-
 					# Leftover hypothetical indexes
 					#region
 					$_.Indexes | Where-Object { $_.General.IsHypothetical } | ForEach-Object {
@@ -3712,7 +3951,6 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 					}
 					#endregion
-
 
 					# Table Foreign Keys Not Trusted
 					#region
@@ -3800,39 +4038,98 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 				}
 				#endregion
 
+				# Trustworthy Bit
+				#region
+				if (
+					@('master','model','msdb','tempdb') -inotcontains $DatabaseName -and
+					$_.Properties.Options.OtherOptions.Miscellaneous.Trustworthy -eq $true -and
+					$($DatabaseServer.Server.Security.ServerRoles | Where-Object { 
+							$_.Name -ieq 'sysadmin' -and
+							$_.Member -icontains $DatabaseOwner
+						} | Measure-Object).count -ge 1
+				) {
+					$Details = "Database is set to trustworthy and the database owner is also a member of the sysadmin fixed server role. Database users with the right permissions can to elevate privileges to the sysadmin role and create unsafe assemblies which can compromise the server. Consider changing the database owner to a non-sysadmin or disable the trustworthy bit if it's not needed."
+
+					Get-AssessmentFinding -ServerName $ServerName `
+					-DatabaseName $DatabaseName `
+					-Priority $MediumPriority `
+					-Category $CatSecurity `
+					-Description 'Trustworthy Bit' `
+					-Details $Details `
+					-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms187861', $HelpUrlModifier, '.aspx'))) 
+				}
+				#endregion
+
+				# Asymmetric Key Encryption Strength
+				#region
+				$_.Security.AsymmetricKeys | Where-Object {
+					@('master','model','msdb','tempdb') -inotcontains $DatabaseName -and
+					$_.Id -and
+					@('1024-bit RSA encryption algorithm','2048-bit RSA encryption algorithm') -inotcontains $_.KeyEncryptionAlgorithm
+				} | ForEach-Object {
+
+					$Details = "Asymmetric Key $($_.Name) is using the $($_.KeyEncryptionAlgorithm) encryption algorithm. An asymmetric key using RSA 1024-bit or stronger encryption is recommended."
+
+					Get-AssessmentFinding -ServerName $ServerName `
+					-DatabaseName $DatabaseName `
+					-Priority $LowPriority `
+					-Category $CatSecurity `
+					-Description 'Asymmetric Key Encryption Strength' `
+					-Details $Details `
+					-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms345262', $HelpUrlModifier, '.aspx'))) 
+				}
+				#endregion
+
+				# Weak Symmetric Keys In User Databases
+				#region
+				$_.Security.SymmetricKeys | Where-Object {
+					@('master','model','msdb','tempdb') -inotcontains $DatabaseName -and
+					$_.Id -and
+					$_.KeyLength -lt 128 -and
+					@('RC2','RC4') -inotcontains $_.EncryptionAlgorithm
+				} | ForEach-Object {
+
+					$Details = "Symmetric Key $($_.Name) is using the $($_.EncryptionAlgorithm) encryption algorithm with a $($_.KeyLength) byte key length. An AES 128 bit or larger or 3DES encryption algorithm is recommended."
+
+					Get-AssessmentFinding -ServerName $ServerName `
+					-DatabaseName $DatabaseName `
+					-Priority $LowPriority `
+					-Category $CatSecurity `
+					-Description 'Weak Symmetric Key' `
+					-Details $Details `
+					-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/ms345262', $HelpUrlModifier, '.aspx'))) 
+				}
+				#endregion
+
+				# User Created Symmetric Keys In System Databases
+				#region
+				$_.Security.SymmetricKeys | Where-Object {
+					$_.Id -and
+					(
+						@('model','msdb','tempdb') -contains $DatabaseName -or 
+						(
+							@('master') -contains $DatabaseName -and
+							$_.Name -inotlike '##MS_ServiceMasterKey##'
+						)
+					)
+				} | ForEach-Object {
+
+					$Details = "Database contains the Symmetric Key $($_.Name). User created symmetric keys in system databases are not recommended."
+
+					Get-AssessmentFinding -ServerName $ServerName `
+					-DatabaseName $DatabaseName `
+					-Priority $LowPriority `
+					-Category $CatSecurity `
+					-Description 'Symmetic Key In System Database' `
+					-Details $Details `
+					-URL $([String]::Concat(@('http://msdn.microsoft.com/en-us/library/cc645607', $HelpUrlModifier, '.aspx'))) 
+				}
+				#endregion
+
 			}
 			#endregion
 
 		}
-		#endregion
-
-
-		#region
-		# # Page Verification Not Optimal (2000)
-		# $SqlServerInventory.DatabaseServer | Where-Object {
-		#     ($_.Server.Configuration.General.Version -ilike '8.*')
-		# } | ForEach-Object {
-		# 	$ServerName = $_.Server.Configuration.General.Name
-		#     $_.Server.Databases | Where-Object {
-		#         ($_.Properties.Options.OtherOptions.Recovery.PageVerify -ine 'CHECKSUM')
-		#     } | Sort-Object -Property $_.Name | ForEach-Object {
-		#         Write-Output $_.Name
-		#     }
-		# }
-		# 
-		# # Page Verification Not Optimal (2005+)
-		# $SqlServerInventory.DatabaseServer | Where-Object {
-		#     ($_.Server.Configuration.General.Version -inotlike '8.*')
-		# } | Sort-Object -Property $_.ServerName | ForEach-Object {
-		#     $_.Server.Databases | Where-Object {
-		#         ($_.Name -ine 'tempdb') -and
-		#         #($_.Properties.Options.OtherOptions.Recovery.PageVerify -ieq 'NONE') -or
-		#         #($_.Properties.Options.OtherOptions.Recovery.PageVerify -ieq 'TORN_PAGE_DETECTION')
-		#         ($_.Properties.Options.OtherOptions.Recovery.PageVerify -ine 'CHECKSUM')
-		#     } | Sort-Object -Property $_.Name | ForEach-Object {
-		#         Write-Output $_.Name
-		#     }
-		# }
 		#endregion
 
 
@@ -3850,7 +4147,8 @@ function Get-SqlServerInventoryDatabaseEngineAssessment {
 
 	}
 	end {
-		Remove-Variable -Name NullDatabaseName
+		Remove-Variable -Name NullDatabaseName, HasDatabaseFile, CanGrowLargerThanDriveFreeSpace, `
+		AllFileGrowthPotentialKB, AssessmentPriority, WindowsServer2003, SQLServer2005
 	}
 }
 
@@ -4385,10 +4683,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Services'
-			#$Worksheet.Tab.Color = $ServicesTabColor
 			$Worksheet.Tab.ThemeColor = $ServicesTabColor
 
-			$RowCount = ($SqlServerInventory.Service | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.Service | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 15
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -4409,7 +4706,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Startup Parameters'
 
 			$Row = 1
-			$SqlServerInventory.Service | ForEach-Object {
+			$SqlServerInventory.Service | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.ComputerName
 				$WorksheetData[$Row,$Col++] = $_.ServerName
@@ -4458,10 +4755,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Overview'
-			#$Worksheet.Tab.Color = $OverviewTabColor
 			$Worksheet.Tab.ThemeColor = $OverviewTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 19
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -4487,7 +4783,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Power Plan'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName # $_.ComputerName
 				$WorksheetData[$Row,$Col++] = $_.ServerName
@@ -4543,12 +4839,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			# 			$Worksheet.Name = 'Server Config'
-			# 			#$Worksheet.Tab.Color = $ServerTabColor
 			# 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 			# 
-			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			# 			#$ColumnCount = 15
-			# 			$ColumnCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			# 			$ColumnCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			# 			$RowCount = 130
 			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
@@ -4692,7 +4987,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			# 			# 130
 			# 
 			# 			$Col = 1
-			# 			$SqlServerInventory.DatabaseServer | Sort-Object -Property $_.ServerName | ForEach-Object {
+			# 			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Sort-Object -Property $_.ServerName | ForEach-Object {
 			# 				$Row = 0
 			# 
 			# 				# General
@@ -4904,10 +5199,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - General'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 15
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -4929,7 +5223,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'AlwaysOn AG Enabled'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Product
@@ -4978,10 +5272,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - Memory'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -4995,7 +5288,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Set Working Set Size'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.Memory.UseAweToAllocateMemory.RunningValue
@@ -5037,10 +5330,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - Processors'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 10
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5057,7 +5349,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Use Windows Fibers'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.Processor.AutoSetProcessorAffinityMask.RunningValue
@@ -5103,10 +5395,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - Security'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5121,7 +5412,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Cross Database Ownership Chaining'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.Security.AuthenticationMode
@@ -5159,10 +5450,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - Connections'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 23
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5192,7 +5482,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'AdHoc Distributed Queries Enabled'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.Connections.MaxConcurrentConnections.RunningValue
@@ -5249,10 +5539,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - DB Settings'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5267,7 +5556,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Default Backup Path'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.DatabaseSettings.IndexFillFactor.RunningValue
@@ -5309,10 +5598,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - Advanced'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 42
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5361,7 +5649,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Query Wait (sec)'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.Advanced.Containment.EnableContainedDatabases.RunningValue
@@ -5453,10 +5741,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - Clustering'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 5
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5468,7 +5755,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Shared Drives'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.HighAvailability.FailoverCluster.IsClusteredInstance
@@ -5514,10 +5801,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - AlwaysOn'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5531,7 +5817,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Cluster Members'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.General.Name
 				$WorksheetData[$Row,$Col++] = $_.Server.Configuration.HighAvailability.AlwaysOn.IsAlwaysOnEnabled
@@ -5579,10 +5865,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Config - Permissions'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Configuration.Permissions | Where-Object { $_.PermissionType } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Configuration.Permissions | Where-Object { $_.PermissionType } } | Measure-Object).Count + 1
 			$ColumnCount = 11
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5647,10 +5932,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Security - Server Logins'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Security.Logins | Where-Object { $_.Sid } }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Security.Logins | Where-Object { $_.Sid } }) | Measure-Object).Count + 1
 			$ColumnCount = 20
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5678,7 +5962,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -5735,10 +6019,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Security - Server Roles'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Security.ServerRoles | Where-Object { $_.Name } }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Security.ServerRoles | Where-Object { $_.Name } }) | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5753,7 +6036,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Member Of'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -5803,11 +6086,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Security - Credentials'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Security.Credentials }) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Security.Credentials | Where-Object { $_.ID } }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Security.Credentials | Where-Object { $_.ID } }) | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5821,7 +6102,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Modify Date'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -5867,10 +6148,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Security - Audits'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Security.Audits | Where-Object { $_.General.ID } }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Security.Audits | Where-Object { $_.General.ID } }) | Measure-Object).Count + 1
 			$ColumnCount = 16
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5893,7 +6173,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Modify Date'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -5952,10 +6232,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Security - Audit Specifications'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Security.ServerAuditSpecifications | ForEach-Object { $_.Actions | Where-Object { $_.Action } } }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Security.ServerAuditSpecifications | ForEach-Object { $_.Actions | Where-Object { $_.Action } } }) | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -5970,7 +6249,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Principal Name'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -5981,8 +6260,6 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					$AuditSpecificationName = $_.Name
 
 					$_.Actions | Where-Object { $_.Action } | ForEach-Object {
-						#$_.Actions | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
-
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName # $_.Actions
 						$WorksheetData[$Row,$Col++] = $AuditName
@@ -6024,11 +6301,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'SVR Objects - Endpoints'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.Endpoints }) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.Endpoints | Where-Object { $_.ID } }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.Endpoints | Where-Object { $_.ID } }) | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6043,12 +6318,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Is System Object'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
 				$_.Server.ServerObjects.Endpoints | Where-Object { $_.ID } | ForEach-Object {
-					#$_.Server.ServerObjects.Endpoints | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.Name
@@ -6090,10 +6364,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			# 			$Worksheet.Name = 'SVR Objects - Linked Server Cfg'
-			# 			#$Worksheet.Tab.Color = $ServerTabColor
 			# 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 			# 
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.LinkedServers }) | Measure-Object).Count + 1
+			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.LinkedServers }) | Measure-Object).Count + 1
 			# 
 			# 			$RowCount = 24
 			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
@@ -6127,7 +6400,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			# 			#24
 			# 
 			# 			$Col = 1
-			# 			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			# 			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 			# 				$ServerName = $_.Server.Configuration.General.Name
 			# 
 			# 				$_.Server.ServerObjects.LinkedServers | Sort-Object -Property $_.Name | ForEach-Object {
@@ -6195,11 +6468,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'SVR Objects - Linked Svr Config'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.LinkedServers }) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.LinkedServers | Where-Object { $_.General.Name } }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.LinkedServers | Where-Object { $_.General.Name } }) | Measure-Object).Count + 1
 			$ColumnCount = 24
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6232,7 +6503,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#24
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$ServerName = $_.Server.Configuration.General.Name
 
 				$_.Server.ServerObjects.LinkedServers | Where-Object { $_.General.Name } | ForEach-Object {
@@ -6300,11 +6571,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'SVR Objects - Linked Svr Logins'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.LinkedServers | ForEach-Object { $_.Security } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.LinkedServers | ForEach-Object { $_.Security | Where-Object { $_.LocalLogin } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.LinkedServers | ForEach-Object { $_.Security | Where-Object { $_.LocalLogin } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6317,7 +6586,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Last Modified Date'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -6325,7 +6594,6 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 					$LinkedServerName = $_.General.Name
 
-					# $_.Security can be null so use Measure-Object to ensure we're only writing results that have data
 					$_.Security | Where-Object { $_.LocalLogin } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
@@ -6369,11 +6637,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'SVR Objects - Startup Procs'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.StartupProcedures } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.StartupProcedures | Where-Object { $_.Name } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.StartupProcedures | Where-Object { $_.Name } } ) | Measure-Object).Count + 1
 			$ColumnCount = 3
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6383,12 +6649,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Procedure Name'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
 				$_.Server.ServerObjects.StartupProcedures | Where-Object { $_.Name } | ForEach-Object {
-					#$_.Server.ServerObjects.StartupProcedures | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.Schema
@@ -6423,11 +6688,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'SVR Objects - Server Triggers'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.Triggers } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.ServerObjects.Triggers | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.ServerObjects.Triggers | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 16
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6450,12 +6713,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Modified Date'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
 				$_.Server.ServerObjects.Triggers | Where-Object { $_.ID } | ForEach-Object {
-					#$_.Server.ServerObjects.Triggers | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.Name
@@ -6506,12 +6768,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - Resource Governor'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
 			$RowCount = (
 				(
-					$SqlServerInventory.DatabaseServer | ForEach-Object {
+					$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 						if (($_.Server.Management.ResourceGovernor.ResourcePools | Where-Object { $_.ID } | Measure-Object).Count -eq 0) {
 							1
 						} else {
@@ -6548,7 +6809,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Workload Group Is System Object'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 				$ResourceGovernor = $_.Server.Management.ResourceGovernor
@@ -6640,10 +6901,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - SQL Trace'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.SQLTrace | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.SQLTrace | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6668,7 +6928,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Dropped Event Count'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -6733,10 +6993,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - SQL Trace Events'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.SQLTrace | ForEach-Object { $_.Events } | Where-Object { $_.CategoryID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.SQLTrace | ForEach-Object { $_.Events } | Where-Object { $_.CategoryID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6798,10 +7057,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - SQL Trace Filters'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.SQLTrace | ForEach-Object { $_.Filters } | Where-Object { $_.ColumnID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.SQLTrace | ForEach-Object { $_.Filters } | Where-Object { $_.ColumnID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6863,11 +7121,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - Trace Flags'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.TraceFlags } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.TraceFlags | Where-Object { $_.TraceFlag } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.TraceFlags | Where-Object { $_.TraceFlag } } ) | Measure-Object).Count + 1
 			$ColumnCount = 5
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6879,7 +7135,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Session'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -6920,11 +7176,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - DB Mail Accounts'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.Accounts } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.Accounts | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.DatabaseMail.Accounts | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 12
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -6942,7 +7196,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'User Name'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -6990,11 +7244,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - DB Mail Profiles'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.Profiles } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.Profiles | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.DatabaseMail.Profiles | Where-Object { $_.ID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 4
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -7005,7 +7257,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Accounts'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -7044,11 +7296,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - DB Mail Security'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.ProfileSecurity } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.ProfileSecurity | Where-Object { $_.ProfileId } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.DatabaseMail.ProfileSecurity | Where-Object { $_.ProfileId } } ) | Measure-Object).Count + 1
 			$ColumnCount = 5
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -7060,7 +7310,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Is Public'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
@@ -7100,11 +7350,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Management - DB Mail Config'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor #$ServerTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.ConfigurationValues } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Management.DatabaseMail.ConfigurationValues | Where-Object { $_.AccountRetryAttempts } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Management.DatabaseMail.ConfigurationValues | Where-Object { $_.AccountRetryAttempts } } ) | Measure-Object).Count + 1
 			$ColumnCount = 9
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -7120,13 +7368,12 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Default Attachment Encoding'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 				$DatabaseMailXpsEnabled = $_.Server.Configuration.Advanced.Miscellaneous.DatabaseMailXPsEnabled.RunningValue
 
 				$_.Server.Management.DatabaseMail.ConfigurationValues | Where-Object { $_.AccountRetryAttempts } | ForEach-Object {
-					#$_.Server.Management.DatabaseMail.ConfigurationValues | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $DatabaseMailXpsEnabled
@@ -7171,10 +7418,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Database Overview'
-			#$Worksheet.Tab.Color = $OverviewTabColor
 			$Worksheet.Tab.ThemeColor = $OverviewTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			$ColumnCount = 17
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -7198,12 +7444,12 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Last Log Backup'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 				$ProductName = $_.Server.Configuration.General.Product
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $ProductName
@@ -7263,12 +7509,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			# 			$Worksheet.Name = 'DB Config'
-			# 			#$Worksheet.Tab.Color = $DatabaseTabColor
 			# 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 			# 
-			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			# 			#$ColumnCount = 15
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			# 			$RowCount = 101
 			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
@@ -7397,7 +7642,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			# 
 			# 				$ServerName = $_.Server.Configuration.General.Name
 			# 
-			# 				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+			# 				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 			# 
 			# 					$Row = 0
 			# 
@@ -7583,10 +7828,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - General'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			$ColumnCount = 24
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -7621,11 +7865,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			# 24
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$Col = 0
 
@@ -7698,11 +7942,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - Files'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Properties.Files.DatabaseFiles } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Properties.Files.DatabaseFiles | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Properties.Files.DatabaseFiles | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 
 			$ColumnCount = 20
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
@@ -7731,16 +7973,15 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
 					$_.Properties.Files.DatabaseFiles | Where-Object { $_.ID } | ForEach-Object {
-						#$_.Properties.Files.DatabaseFiles | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -7798,11 +8039,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - Filegroups'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Properties.FileGroups.Rows } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Properties.FileGroups.Rows | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Properties.FileGroups.Rows | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
@@ -7817,16 +8056,15 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Is Default'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
 					$_.Properties.FileGroups.Rows | Where-Object { $_.ID } | ForEach-Object {
-						#$_.Properties.FileGroups.Rows | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -7878,10 +8116,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - Options'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			$ColumnCount = 53
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -7951,11 +8188,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			# 53
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$Col = 0
 
@@ -8066,10 +8303,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - AlwaysOn'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8084,12 +8320,12 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			# 5
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 				$AlwaysOnAgEnabled = $_.Server.Configuration.General.IsHadrEnabled
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$Col = 0
 
@@ -8131,10 +8367,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - Change Tracking'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8147,11 +8382,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Auto Cleanup'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.Name
@@ -8190,10 +8425,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - Permissions'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Properties.Permissions | Where-Object { $_.PermissionType } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Properties.Permissions | Where-Object { $_.PermissionType } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 12
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8216,7 +8450,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
@@ -8266,10 +8500,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Config - Mirroring'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			$ColumnCount = 15
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8291,11 +8524,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Mirroring Witness Status'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.Name
@@ -8347,11 +8580,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Security - Users'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.User } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.User | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Security.User | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 15
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8373,11 +8604,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Last Modified Date'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
@@ -8429,11 +8660,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Security - Database Roles'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.DatabaseRole } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.DatabaseRole | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Security.DatabaseRole | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 10
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8449,11 +8678,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Member Of'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
@@ -8499,11 +8728,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Security - Application Roles'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.ApplicationRole } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.ApplicationRole | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Security.ApplicationRole | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8516,11 +8743,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Last Modified Date'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
@@ -8563,11 +8790,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Security - Schemas'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.Schema } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.Schema | Where-Object { $_.Name } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Security.Schema | Where-Object { $_.Name } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 5
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8579,16 +8804,15 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Is System Object'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
 					$_.Security.Schema | Where-Object { $_.Name } | ForEach-Object { 
-						#$_.Security.Schema | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object { 
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -8623,11 +8847,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Security - Asymmetric Keys'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.AsymmetricKeys } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.AsymmetricKeys | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Security.AsymmetricKeys | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8642,16 +8864,15 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Provider Name'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
 					$_.Security.AsymmetricKeys | Where-Object { $_.ID } | ForEach-Object {
-						#$_.Security.AsymmetricKeys | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -8689,11 +8910,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Security - Certificates'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.Certificates } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.Certificates | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Security.Certificates | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 12
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8712,16 +8931,15 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Last Backup Date'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
 					$_.Security.Certificates | Where-Object { $_.ID } | ForEach-Object {
-						#$_.Security.Certificates | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -8768,11 +8986,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'DB Security - Symmetric Keys'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.SymmetricKeys } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Security.SymmetricKeys | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Security.SymmetricKeys | Where-Object { $_.ID } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 11
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -8790,16 +9006,15 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Is Open'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 
 					$DatabaseName = $_.Name
 
 					$_.Security.SymmetricKeys | Where-Object { $_.ID } | ForEach-Object {
-						#$_.Security.SymmetricKeys | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $DatabaseName
@@ -8846,13 +9061,12 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			# 			$Worksheet.Name = 'Agent Config'
-			# 			#$Worksheet.Tab.Color = $AgentTabColor
 			# 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 			# 
 			# 			#$ColumnCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.Agent.Configuration } | Measure-Object).Count + 1
 			# 
 			# 			# Option 1: Report only instances that have the SQL Agent enabled
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Configuration } ) | Measure-Object).Count + 1
+			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Configuration } ) | Measure-Object).Count + 1
 			# 
 			# 			# Option 2: Report all instances, leave blanks for those that don't have the SQL Agent enabled
 			# 			#$ColumnCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
@@ -9042,15 +9256,14 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Config'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
 
 			# Option 1: Report only instances that have the SQL Agent enabled
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Configuration } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Configuration } ) | Measure-Object).Count + 1
 
 			# Option 2: Report all instances, leave blanks for those that don't have the SQL Agent enabled
-			#$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			#$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 
 			$ColumnCount = 50
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
@@ -9237,11 +9450,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Jobs'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs | Where-Object { $_.General.Name } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Jobs | Where-Object { $_.General.Name } } ) | Measure-Object).Count + 1
 			$ColumnCount = 11
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -9260,12 +9471,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Description'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
 				$_.Agent.Jobs | Where-Object { $_.General.Name } | ForEach-Object {
-					#$_.Agent.Jobs | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.General.Name
@@ -9311,11 +9521,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Jobs - Steps'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Steps } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Steps | Where-Object { $_.Id } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Steps | Where-Object { $_.Id } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 17
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -9339,7 +9547,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Log File'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
@@ -9349,7 +9557,6 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					$JobEnabled = $_.General.Enabled
 
 					$_.Steps | Where-Object { $_.Id } | ForEach-Object {
-						#$_.Steps | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $JobName
@@ -9404,11 +9611,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Jobs - Schedules'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Schedules } } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Schedules | Where-Object { $_.Id } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Schedules | Where-Object { $_.Id } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -9422,7 +9627,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Description'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
@@ -9432,7 +9637,6 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 					$JobEnabled = $_.General.Enabled
 
 					$_.Schedules | Where-Object { $_.Id } | ForEach-Object {
-						#$_.Schedules | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 						$Col = 0
 						$WorksheetData[$Row,$Col++] = $ServerName
 						$WorksheetData[$Row,$Col++] = $JobName
@@ -9471,10 +9675,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Jobs - Alerts'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Alerts | Where-Object { $_.General.Id } } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Jobs | ForEach-Object { $_.Alerts | Where-Object { $_.General.Id } } } ) | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -9494,7 +9697,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Notify Operators'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
@@ -9562,11 +9765,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Jobs - Notifications'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Jobs | Where-Object { $_.General.Name } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Jobs | Where-Object { $_.General.Name } } ) | Measure-Object).Count + 1
 			$ColumnCount = 11
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -9583,12 +9784,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Delete Job'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
 				$_.Agent.Jobs | Where-Object { $_.General.Name } | ForEach-Object {
-					#$_.Agent.Jobs | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.General.Name
@@ -9628,11 +9828,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Alerts'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Alerts } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Alerts | Where-Object { $_.General.ID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Alerts | Where-Object { $_.General.ID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 23
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -9663,12 +9861,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
 				$_.Agent.Alerts | Where-Object { $_.General.ID } | ForEach-Object {
-					#$_.Agent.Alerts | Where-Object { ($_ | Measure-Object).Count -gt 0 } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $_.General.Name
@@ -9742,12 +9939,11 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			# 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			# 			$Worksheet.Name = 'Agent Operators 2'
-			# 			#$Worksheet.Tab.Color = $AgentTabColor
 			# 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 			# 
-			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			# 			#$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			# 			#$ColumnCount = 15
-			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Operators } ) | Measure-Object).Count + 1
+			# 			$ColumnCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Operators } ) | Measure-Object).Count + 1
 			# 			$RowCount = 24
 			# 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 			# 
@@ -9896,11 +10092,9 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Agent Operators'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			#$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Operators } ) | Measure-Object).Count + 1
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Agent.Operators | Where-Object { $_.General.ID } } ) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Agent.Operators | Where-Object { $_.General.ID } } ) | Measure-Object).Count + 1
 			$ColumnCount = 19
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -9926,7 +10120,7 @@ function Export-SqlServerInventoryDatabaseEngineConfigToExcel {
 			$WorksheetData[0,$Col++] = 'Jobs'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.ServerName
 
@@ -10974,7 +11168,6 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Services'
-			#$Worksheet.Tab.Color = $ServicesTabColor
 			$Worksheet.Tab.ThemeColor = $ServicesTabColor
 
 			$RowCount = ($SqlServerInventory.Service | Measure-Object).Count + 1
@@ -11050,10 +11243,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Server Overview'
-			#$Worksheet.Tab.Color = $OverviewTabColor
 			$Worksheet.Tab.ThemeColor = $OverviewTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | Measure-Object).Count + 1
 			$ColumnCount = 19
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11079,7 +11271,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			$WorksheetData[0,$Col++] = 'Power Plan'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 				$Col = 0
 				$WorksheetData[$Row,$Col++] = $_.Machine.OperatingSystem.Settings.ComputerSystem.FullyQualifiedDomainName # $_.ComputerName
 				$WorksheetData[$Row,$Col++] = $_.ServerName
@@ -11135,10 +11327,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Database Overview'
-			#$Worksheet.Tab.Color = $OverviewTabColor
 			$Worksheet.Tab.ThemeColor = $OverviewTabColor
 
-			$RowCount = (($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases }) | Measure-Object).Count + 1
+			$RowCount = (($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } }) | Measure-Object).Count + 1
 			$ColumnCount = 17
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11162,12 +11353,12 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			$WorksheetData[0,$Col++] = 'Last Log Backup'
 
 			$Row = 1
-			$SqlServerInventory.DatabaseServer | ForEach-Object {
+			$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object {
 
 				$ServerName = $_.Server.Configuration.General.Name
 				$ProductName = $_.Server.Configuration.General.Product
 
-				$_.Server.Databases | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object {
 					$Col = 0
 					$WorksheetData[$Row,$Col++] = $ServerName
 					$WorksheetData[$Row,$Col++] = $ProductName
@@ -11227,10 +11418,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - General'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 27
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11269,7 +11459,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11334,10 +11524,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Change Tracking'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11355,7 +11544,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11398,7 +11587,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			$Worksheet.Name = 'Tables - Storage'
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 23
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11432,7 +11621,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11496,10 +11685,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Columns'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 44
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11554,7 +11742,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11645,10 +11833,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Default Constraints'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Columns | Where-Object { $_.DefaultConstraint.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Columns | Where-Object { $_.DefaultConstraint.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11671,7 +11858,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11726,10 +11913,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Checks'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Checks | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Checks | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 14
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11753,7 +11939,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11809,10 +11995,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Foreign Keys'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.ForeignKeys | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.ForeignKeys | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11841,7 +12026,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11902,10 +12087,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - FullText Indexes'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.FullTextIndex | Where-Object { $_.General.CatalogName } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.FullTextIndex | Where-Object { $_.General.CatalogName } } } } | Measure-Object).Count + 1
 			$ColumnCount = 17
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -11934,7 +12118,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -11996,12 +12180,11 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - FullText Index Columns'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
 			$RowCount = (
-				$SqlServerInventory.DatabaseServer | ForEach-Object { 
-					$_.Server.Databases | ForEach-Object { 
+				$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { 
+					$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { 
 						$_.Tables | ForEach-Object { 
 							$_.FullTextIndex | Where-Object { $_.General.CatalogName } | ForEach-Object { 
 								$_.Columns | Where-Object { $_.Name } 
@@ -12031,7 +12214,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12089,10 +12272,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Indexes'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 26
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12129,7 +12311,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12197,10 +12379,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Index Options'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12229,7 +12410,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12289,10 +12470,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Index Storage'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 10
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12313,7 +12493,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12363,10 +12543,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Index Filters'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.HasFilter -eq $true } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.HasFilter -eq $true } } } } | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12383,7 +12562,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12429,10 +12608,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Index Spatial'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.IsSpatialIndex -eq $true } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Indexes | Where-Object { $_.General.IsSpatialIndex -eq $true } } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12461,7 +12639,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12525,10 +12703,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Statistics'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Statistics | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Statistics | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12552,7 +12729,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12607,10 +12784,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Triggers'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Triggers | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Triggers | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 26
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12647,7 +12823,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12715,10 +12891,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Tables - Trigger Definitions'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Tables | ForEach-Object { $_.Triggers | Where-Object { $_.ImplementationType -ieq 'T-SQL' } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Tables | ForEach-Object { $_.Triggers | Where-Object { $_.ImplementationType -ieq 'T-SQL' } } } } | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12735,7 +12910,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Tables | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12781,10 +12956,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - General'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | Where-Object { $_.Properties.General.Description.Name } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | Where-Object { $_.Properties.General.Description.Name } } } | Measure-Object).Count + 1
 			$ColumnCount = 23
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12818,7 +12992,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -12879,10 +13053,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - Columns'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 44
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -12937,7 +13110,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13028,10 +13201,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - FullText Indexes'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.FullTextIndex | Where-Object { $_.General.CatalogName } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.FullTextIndex | Where-Object { $_.General.CatalogName } } } } | Measure-Object).Count + 1
 			$ColumnCount = 17
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13060,7 +13232,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13122,12 +13294,11 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - FullText Index Columns'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
 			$RowCount = (
-				$SqlServerInventory.DatabaseServer | ForEach-Object { 
-					$_.Server.Databases | ForEach-Object { 
+				$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { 
+					$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { 
 						$_.Views | ForEach-Object { 
 							$_.FullTextIndex | Where-Object { $_.General.CatalogName } | ForEach-Object { 
 								$_.Columns | Where-Object { $_.Name } 
@@ -13157,7 +13328,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13215,10 +13386,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - Indexes'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 26
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13255,7 +13425,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13323,10 +13493,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - Index Options'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13355,7 +13524,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13415,10 +13584,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - Index Storage'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 10
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13439,7 +13607,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13489,10 +13657,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - Statistics'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.Statistics | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.Statistics | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13516,7 +13683,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13571,10 +13738,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - Triggers'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.Triggers | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.Triggers | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 26
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13611,7 +13777,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13679,10 +13845,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Views - Trigger Definitions'
-			#$Worksheet.Tab.Color = $DatabaseTabColor
 			$Worksheet.Tab.ThemeColor = $DatabaseTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Views | ForEach-Object { $_.Triggers | Where-Object { $_.ImplementationType -ieq 'T-SQL' } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Views | ForEach-Object { $_.Triggers | Where-Object { $_.ImplementationType -ieq 'T-SQL' } } } } | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13699,7 +13864,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Views | Where-Object { $_.Properties.General.Description.Name } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13745,10 +13910,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Synonyms'
-			#$Worksheet.Tab.Color = $SecurityTabColor
 			$Worksheet.Tab.ThemeColor = $SecurityTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Synonyms | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Synonyms | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 12
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13771,7 +13935,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Synonyms | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -13821,10 +13985,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Stored Procedures - General'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 21
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -13856,7 +14019,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -13915,12 +14078,11 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Stored Procedures - Parameters'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
 			$RowCount = (
-				$SqlServerInventory.DatabaseServer | ForEach-Object { 
-					$_.Server.Databases | ForEach-Object { 
+				$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { 
+					$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { 
 						$_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } | ForEach-Object { 
 							$_.Parameters | Where-Object { $_.ID } 
 						} 
@@ -13954,7 +14116,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14016,10 +14178,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Stored Procedures - Definition'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 5
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14035,7 +14196,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.StoredProcedures | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14075,10 +14236,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Extended Stored Procedures'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.ExtendedStoredProcedures | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.ExtendedStoredProcedures | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 21
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14097,7 +14257,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.ExtendedStoredProcedures | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -14143,10 +14303,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - General'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 31
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14188,7 +14347,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14261,10 +14420,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Columns'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 44
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14319,7 +14477,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14410,10 +14568,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Default Constraints'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Columns | Where-Object { $_.DefaultConstraint.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Columns | Where-Object { $_.DefaultConstraint.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14436,7 +14593,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14491,10 +14648,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Checks'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Checks | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Checks | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 14
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14518,7 +14674,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14574,10 +14730,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Indexes'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 26
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14614,7 +14769,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14682,10 +14837,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Index Options'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14714,7 +14868,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14774,10 +14928,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Index Storage'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 10
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14798,7 +14951,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14848,12 +15001,11 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Parameters'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
 			$RowCount = (
-				$SqlServerInventory.DatabaseServer | ForEach-Object { 
-					$_.Server.Databases | ForEach-Object { 
+				$SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { 
+					$_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { 
 						$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | ForEach-Object { 
 							$_.Parameters | Where-Object { $_.ID } 
 						} 
@@ -14887,7 +15039,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -14949,10 +15101,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Functions - Definition'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 5
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -14968,7 +15119,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Functions | Where-Object { $_.Properties.General.Description.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Description.Schema}}, @{Expression={$_.Properties.General.Description.Name}} | ForEach-Object {
@@ -15008,10 +15159,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Database Triggers'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.DatabaseTriggers | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.DatabaseTriggers | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
@@ -15041,7 +15191,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.DatabaseTriggers | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -15098,10 +15248,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Database Triggers - Definition'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.DatabaseTriggers | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.DatabaseTriggers | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
@@ -15117,7 +15266,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.DatabaseTriggers | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -15157,10 +15306,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Assemblies'
-			#$Worksheet.Tab.Color = $ServerTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor #$ServerTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Assemblies | Where-Object { $_.Properties.General.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Assemblies | Where-Object { $_.Properties.General.ID } } } | Measure-Object).Count + 1
 
 			$ColumnCount = 12
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
@@ -15184,7 +15332,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Assemblies | Where-Object { $_.Properties.General.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Owner}}, @{Expression={$_.Properties.General.Name}} | ForEach-Object {
@@ -15234,10 +15382,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Aggregates'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedAggregates | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedAggregates | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15266,7 +15413,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedAggregates | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -15325,10 +15472,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Aggregates Parameters'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedAggregates | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedAggregates | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15352,7 +15498,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedAggregates | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -15409,10 +15555,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Data Types'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedDataTypes | Where-Object { $_.Properties.General.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedDataTypes | Where-Object { $_.Properties.General.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 21
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15444,7 +15589,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedDataTypes | Where-Object { $_.Properties.General.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Schema}}, @{Expression={$_.Properties.General.Name}} | ForEach-Object {
@@ -15506,10 +15651,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Table Types'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | Where-Object { $_.Properties.General.Description.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15533,7 +15677,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTableTypes | 
@@ -15587,10 +15731,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Table Types Columns'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Columns | Where-Object { $_.General.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 44
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15645,7 +15788,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTableTypes | 
@@ -15740,10 +15883,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Table Types DF CSTR'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Columns | Where-Object { $_.DefaultConstraint.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Columns | Where-Object { $_.DefaultConstraint.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 13
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15766,7 +15908,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTableTypes | 
@@ -15824,10 +15966,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Table Types Checks'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Checks | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Checks | Where-Object { $_.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 14
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15851,7 +15992,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTableTypes | 
@@ -15910,10 +16051,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Table Types Indexes'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 26
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -15950,7 +16090,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTableTypes | 
@@ -16021,10 +16161,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Table Types Idx Options'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16053,7 +16192,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTableTypes | 
@@ -16116,10 +16255,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - Table Types Idx Storage'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTableTypes | ForEach-Object { $_.Indexes | Where-Object { $_.General.ID } } } } | Measure-Object).Count + 1
 			$ColumnCount = 10
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16140,7 +16278,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTableTypes | 
@@ -16193,10 +16331,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - CLR Types'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.UserDefinedTypes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.UserDefinedTypes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16225,7 +16362,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.UserDefinedTypes | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16282,10 +16419,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Types - XML Schema Collections'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Types.XmlSchemaCollections | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Types.XmlSchemaCollections | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16303,7 +16439,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Types.XmlSchemaCollections | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16348,10 +16484,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Rules'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Rules | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Rules | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16369,7 +16504,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Rules | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16414,10 +16549,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Defaults'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Defaults | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Defaults | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 5
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16433,7 +16567,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Defaults | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16473,10 +16607,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Plan Guides'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.PlanGuides | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.PlanGuides | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 12
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16499,7 +16632,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.PlanGuides | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Schema}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16546,10 +16679,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Sequences'
-			#$Worksheet.Tab.Color = $ServerObjectsTabColor
 			$Worksheet.Tab.ThemeColor = $ServerObjectsTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Programmability.Sequences | Where-Object { $_.Properties.General.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Programmability.Sequences | Where-Object { $_.Properties.General.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 18
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16578,7 +16710,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Programmability.Sequences | Where-Object { $_.Properties.General.ID } | Sort-Object -Property @{Expression={$_.Properties.General.Schema}}, @{Expression={$_.Properties.General.Name}} | ForEach-Object {
@@ -16640,10 +16772,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Broker - Message Types'
-			#$Worksheet.Tab.Color = $ManagementTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.ServiceBroker.MessageTypes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.ServiceBroker.MessageTypes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16662,7 +16793,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.ServiceBroker.MessageTypes | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16705,10 +16836,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Broker - Contracts'
-			#$Worksheet.Tab.Color = $ManagementTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.ServiceBroker.ServiceContracts | ForEach-Object { $_.MessageTypeMappings | Where-Object { $_.Name } } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.ServiceBroker.ServiceContracts | ForEach-Object { $_.MessageTypeMappings | Where-Object { $_.Name } } } } | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16726,7 +16856,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.ServiceBroker.ServiceContracts | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16774,10 +16904,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Broker - Queues'
-			#$Worksheet.Tab.Color = $ManagementTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.ServiceBroker.Queues | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.ServiceBroker.Queues | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 19
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16807,7 +16936,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.ServiceBroker.Queues | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16866,10 +16995,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Broker - Services'
-			#$Worksheet.Tab.Color = $ManagementTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.ServiceBroker.Services | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.ServiceBroker.Services | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16888,7 +17016,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.ServiceBroker.Services | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -16931,10 +17059,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Broker - Routes'
-			#$Worksheet.Tab.Color = $ManagementTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.ServiceBroker.Routes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.ServiceBroker.Routes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 9
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -16954,7 +17081,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.ServiceBroker.Routes | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -17000,10 +17127,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Broker - Remote Service Binding'
-			#$Worksheet.Tab.Color = $ManagementTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.ServiceBroker.RemoteServiceBindings | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.ServiceBroker.RemoteServiceBindings | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -17021,7 +17147,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.ServiceBroker.RemoteServiceBindings | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -17063,10 +17189,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Broker - Priorities'
-			#$Worksheet.Tab.Color = $ManagementTabColor
 			$Worksheet.Tab.ThemeColor = $ManagementTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.ServiceBroker.Priorities | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.ServiceBroker.Priorities | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -17085,7 +17210,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.ServiceBroker.Priorities | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -17130,10 +17255,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Storage - Full Text Catalogs'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Storage.FullTextCatalogs | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Storage.FullTextCatalogs | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 16
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -17160,7 +17284,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Storage.FullTextCatalogs | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -17218,10 +17342,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Storage - Full Text Stoplists'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Storage.FullTextStopLists | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Storage.FullTextStopLists | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 6
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -17238,7 +17361,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Storage.FullTextStopLists | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -17287,10 +17410,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Storage - Partition Schemes'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Storage.PartitionSchemes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Storage.PartitionSchemes | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 7
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -17308,7 +17430,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Storage.PartitionSchemes | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Owner}}, @{Expression={$_.Name}} | ForEach-Object {
@@ -17350,10 +17472,9 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 			#region
 			$Worksheet = $Excel.Worksheets.Item($WorksheetNumber)
 			$Worksheet.Name = 'Storage - Partition Functions'
-			#$Worksheet.Tab.Color = $AgentTabColor
 			$Worksheet.Tab.ThemeColor = $AgentTabColor
 
-			$RowCount = ($SqlServerInventory.DatabaseServer | ForEach-Object { $_.Server.Databases | ForEach-Object { $_.Storage.PartitionFunctions | Where-Object { $_.ID } } } | Measure-Object).Count + 1
+			$RowCount = ($SqlServerInventory.DatabaseServer | Where-Object { $_.InventoryServiceId } | ForEach-Object { $_.Server.Databases | Where-Object { $_.Id } | ForEach-Object { $_.Storage.PartitionFunctions | Where-Object { $_.ID } } } | Measure-Object).Count + 1
 			$ColumnCount = 8
 			$WorksheetData = New-Object -TypeName 'string[,]' -ArgumentList $RowCount, $ColumnCount
 
@@ -17373,7 +17494,7 @@ function Export-SqlServerInventoryDatabaseEngineDbObjectsToExcel {
 
 				$ServerName = $_.Server.Configuration.General.Name
 
-				$_.Server.Databases | Sort-Object -Property Name | ForEach-Object {
+				$_.Server.Databases | Where-Object { $_.Id } | Sort-Object -Property Name | ForEach-Object {
 					$DatabaseName = $_.Name
 
 					$_.Storage.PartitionFunctions | Where-Object { $_.ID } | Sort-Object -Property @{Expression={$_.Name}} | ForEach-Object {

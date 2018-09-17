@@ -57,9 +57,6 @@ function Get-ActiveDirectoryDnsConfiguration {
 
 		foreach ($Computer in $ComputerName) {
 
-
-			Write-Verbose "Processing $Computer"
-
 			$ComputerDomain = Get-ComputerDomain -ComputerName $Computer
 
 			Get-WmiObject -Namespace root\CIMV2 -Class Win32_NetworkAdapterConfiguration `
@@ -153,7 +150,7 @@ function Get-DnsARecord {
 			$DnsServerIPAddress | ForEach-Object {
 				try {
 					$DnsServer = $_
-					Get-WMIObject -Namespace root\MicrosoftDNS -Class MicrosoftDNS_AType -Computer $_ -Filter "ContainerName= '$Domain'" | 
+					Get-WMIObject -Namespace root\MicrosoftDNS -Class MicrosoftDNS_AType -Computer $_ -Filter "ContainerName= '$Domain'" -ErrorAction Stop | 
 					Where-Object {$_.DomainName -ine $_.OwnerName } | 
 					Select-Object OwnerName, IPAddress | 
 					ForEach-Object {
@@ -1319,7 +1316,7 @@ function Find-SqlServerService {
 						if ($_.AdvancedProperties['CLUSTERED'].Value -eq $true) {
 							$IsClusteredInstance = $true
 
-							Get-WmiObject -Namespace root\CIMV2 -Class Win32_ComputerSystem -Property Domain -ComputerName $IpAddress | ForEach-Object {
+							Get-WmiObject -Namespace root\CIMV2 -Class Win32_ComputerSystem -Property Domain -ComputerName $IpAddress -ErrorAction Stop | ForEach-Object {
 								$DomainName = $_.Domain
 							}
 
@@ -1401,8 +1398,13 @@ function Find-SqlServerService {
 
 					# Get the Service Start Date (if it's got a Process ID greater than than 0)
 					if ($_.ProcessId -gt 0) {
-						Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$($_.ProcessId)'" -Property CreationDate -ComputerName $IpAddress | ForEach-Object {
-							$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+						try {
+							Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$($_.ProcessId)'" -Property CreationDate -ComputerName $IpAddress -ErrorAction Stop | ForEach-Object {
+								$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+							}
+						}
+						catch {
+							$ServiceStartDate = $null
 						}
 					} else {
 						$ServiceStartDate = $null
@@ -1464,7 +1466,7 @@ function Find-SqlServerService {
 
 						# Use the WMI Registry provider to access the registry on $ComputerName
 						# For info on using this WMI class see http://msdn.microsoft.com/en-us/library/windows/desktop/aa393664(v=vs.85).aspx
-						$StdRegProv = Get-WmiObject -Namespace root\DEFAULT -Query "select * FROM meta_class WHERE __Class = 'StdRegProv'" -ComputerName $ComputerName
+						$StdRegProv = Get-WmiObject -Namespace root\DEFAULT -Query "select * FROM meta_class WHERE __Class = 'StdRegProv'" -ComputerName $ComputerName -ErrorAction Stop
 
 						# Iterate through installed instances of the Database Engine (which includes the SQL Agent)
 						$($StdRegProv.GetMultiStringValue($HKEY_LOCAL_MACHINE,'SOFTWARE\Microsoft\Microsoft SQL Server','InstalledInstances')).sValue | ForEach-Object {
@@ -1496,7 +1498,10 @@ function Find-SqlServerService {
 							}
 
 							# Get Service Information
-							Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service -Filter "DisplayName = '$DisplayName'" -Property PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress | ForEach-Object {
+							Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service `
+							-Filter "DisplayName = '$DisplayName'" `
+							-Property PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress -ErrorAction Stop | 
+							ForEach-Object {
 								$PathName = $_.PathName
 								$StartMode = $_.StartMode
 								$ProcessId = $_.ProcessId
@@ -1507,8 +1512,13 @@ function Find-SqlServerService {
 
 							# Get the Service Start Date (if it's got a Process ID greater than than 0)
 							if ($ProcessId -gt 0) {
-								Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$ProcessId'" -Property CreationDate -ComputerName $IpAddress | ForEach-Object {
-									$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+								try {
+									Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$ProcessId'" -Property CreationDate -ComputerName $IpAddress -ErrorAction Stop | ForEach-Object {
+										$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+									}
+								}
+								catch {
+									$ServiceStartDate = $null
 								}
 							} else {
 								$ServiceStartDate = $null
@@ -1596,7 +1606,10 @@ function Find-SqlServerService {
 							}
 
 							# Get Service Information
-							Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service -Filter "DisplayName = '$DisplayName'" -Property PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress | ForEach-Object {
+							Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service `
+							-Filter "DisplayName = '$DisplayName'" `
+							-Property PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress -ErrorAction Stop | 
+							ForEach-Object {
 								$PathName = $_.PathName
 								$StartMode = $_.StartMode
 								$ProcessId = $_.ProcessId
@@ -1607,8 +1620,13 @@ function Find-SqlServerService {
 
 							# Get the Service Start Date (if it's got a Process ID greater than than 0)
 							if ($ProcessId -gt 0) {
-								Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$ProcessId'" -Property CreationDate -ComputerName $IpAddress | ForEach-Object {
-									$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+								try {
+									Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$ProcessId'" -Property CreationDate -ComputerName $IpAddress -ErrorAction Stop | ForEach-Object {
+										$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+									}
+								}
+								catch {
+									$ServiceStartDate = $null
 								}
 							} else {
 								$ServiceStartDate = $null
@@ -1657,7 +1675,7 @@ function Find-SqlServerService {
 						# You can't have more than one instance of each in 2000
 						Get-WmiObject -Namespace root\CIMV2 -Class Win32_Service `
 						-Filter "(DisplayName = 'MSSQLServerOLAPService') or (DisplayName = 'Microsoft Search') or (DisplayName = 'ReportServer')" `
-						-Property DisplayName,PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress | 
+						-Property DisplayName,PathName,StartMode,ProcessId,State,StartName,Description -ComputerName $IpAddress -ErrorAction Stop | 
 						ForEach-Object {
 
 							$DisplayName = $_.DisplayName
@@ -1670,8 +1688,13 @@ function Find-SqlServerService {
 
 							# Get the Service Start Date (if it's got a Process ID greater than than 0)
 							if ($ProcessId -gt 0) {
-								Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$ProcessId'" -Property CreationDate -ComputerName $IpAddress | ForEach-Object {
-									$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+								try {
+									Get-WmiObject -Namespace root\CIMV2 -Class Win32_Process -Filter "ProcessId = '$ProcessId'" -Property CreationDate -ComputerName $IpAddress -ErrorAction Stop | ForEach-Object {
+										$ServiceStartDate = $_.ConvertToDateTime($_.CreationDate)
+									}
+								}
+								catch {
+									$ServiceStartDate = $null
 								}
 							} else {
 								$ServiceStartDate = $null

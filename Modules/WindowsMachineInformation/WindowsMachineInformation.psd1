@@ -4,7 +4,7 @@
 	ModuleToProcess = 'WindowsMachineInformation'
 
 	# Version number of this module.
-	ModuleVersion = '1.0.0.0'
+	ModuleVersion = '1.0.1.0'
 
 	# ID used to uniquely identify this module
 	GUID = '{f885012a-cde3-40d4-a7a2-428fb6047839}'

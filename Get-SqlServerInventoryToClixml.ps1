@@ -185,67 +185,52 @@
 		.\Convert-SqlServerInventoryClixmlToExcel.ps1
 
 #>
-[cmdletBinding(SupportsShouldProcess=$True, DefaultParametersetName='computername_WindowsAuthentication')]
+[cmdletBinding(SupportsShouldProcess=$True, DefaultParametersetName='computername')]
 param(
-	[Parameter(Mandatory=$true, ParameterSetName='dns_SQLAuthentication', HelpMessage='DNS Server(s)')]
-	[Parameter(Mandatory=$true, ParameterSetName='dns_WindowsAuthentication', HelpMessage='DNS Server(s)')]
+	[Parameter(Mandatory=$true, ParameterSetName='dns', HelpMessage='DNS Server(s)')]
 	[alias('dns')]
 	[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^auto$|^automatic$')]
 	[string[]]
 	$DnsServer = 'automatic'
 	,
-	[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication', HelpMessage='DNS Domain Name')] 
-	[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication', HelpMessage='DNS Domain Name')] 
+	[Parameter(Mandatory=$false, ParameterSetName='dns', HelpMessage='DNS Domain Name')]
 	[alias('domain')]
 	[string]
 	$DnsDomain = 'automatic'
 	,
-	[Parameter(Mandatory=$true, ParameterSetName='subnet_SQLAuthentication', HelpMessage='Subnet (in CIDR notation)')] 
-	[Parameter(Mandatory=$true, ParameterSetName='subnet_WindowsAuthentication', HelpMessage='Subnet (in CIDR notation)')] 
+	[Parameter(Mandatory=$true, ParameterSetName='subnet', HelpMessage='Subnet (in CIDR notation)')] 
 	[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]\d{1,2}$|^auto$|^automatic$')]
 	[string[]]
 	$Subnet = 'automatic'
 	,
-	[Parameter(Mandatory=$true, ParameterSetName='computername_SQLAuthentication', HelpMessage='Computer Name(s)')] 
-	[Parameter(Mandatory=$true, ParameterSetName='computername_WindowsAuthentication', HelpMessage='Computer Name(s)')] 
+	[Parameter(Mandatory=$true, ParameterSetName='computername', HelpMessage='Computer Name(s)')] 
 	[alias('computer')]
 	[string[]]
 	$ComputerName
 	,
-	[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication')]
-	[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication')]
-	[Parameter(Mandatory=$false, ParameterSetName='subnet_SQLAuthentication')]
-	[Parameter(Mandatory=$false, ParameterSetName='subnet_WindowsAuthentication')]
+	[Parameter(Mandatory=$false, ParameterSetName='dns')]
+	[Parameter(Mandatory=$false, ParameterSetName='subnet')]
 	[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]\d{1,2}$')]
 	[string[]]
 	$ExcludeSubnet
 	,
-	[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication')]
-	[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication')]
+	[Parameter(Mandatory=$false, ParameterSetName='dns')]
 	[ValidatePattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]\d{1,2}$')]
 	[string[]]
 	$LimitSubnet
 	,
-	[Parameter(Mandatory=$false, ParameterSetName='dns_SQLAuthentication')]
-	[Parameter(Mandatory=$false, ParameterSetName='dns_WindowsAuthentication')]
-	[Parameter(Mandatory=$false, ParameterSetName='subnet_SQLAuthentication')]
-	[Parameter(Mandatory=$false, ParameterSetName='subnet_WindowsAuthentication')]
+	[Parameter(Mandatory=$false, ParameterSetName='dns')]
+	[Parameter(Mandatory=$false, ParameterSetName='subnet')]
 	[string[]]
 	$ExcludeComputerName
 	, 
-	[Parameter(Mandatory=$true, ParameterSetName='dns_SQLAuthentication') ]
-	[Parameter(Mandatory=$true, ParameterSetName='subnet_SQLAuthentication') ]
-	[Parameter(Mandatory=$true, ParameterSetName='computername_SQLAuthentication') ]
-	[ValidateNotNull()]
+	[Parameter(Mandatory=$false)] 
 	[System.String]
-	$Username
+	$Username = $null
 	,
-	[Parameter(Mandatory=$true, ParameterSetName='dns_SQLAuthentication') ]
-	[Parameter(Mandatory=$true, ParameterSetName='subnet_SQLAuthentication') ]
-	[Parameter(Mandatory=$true, ParameterSetName='computername_SQLAuthentication') ]
-	[ValidateNotNull()]
+	[Parameter(Mandatory=$false)] 
 	[System.String]
-	$Password
+	$Password = $null
 	,
 	[Parameter(Mandatory=$false)] 
 	[ValidateRange(1,100)]
@@ -387,43 +372,24 @@ $ParameterHash = @{
 	IncludeDatabaseObjectPermissions = $IncludeDatabaseObjectPermissions
 	IncludeDatabaseObjectInformation = $IncludeDatabaseObjectInformation
 	IncludeDatabaseSystemObjects = $IncludeDatabaseSystemObjects
+	Username = $Username
+	Password = $Password
 }
 
 switch ($PsCmdlet.ParameterSetName) {
-	'dns_SQLAuthentication' {
-		$ParameterHash.Add('Username',$Username)
-		$ParameterHash.Add('Password',$Password)
+	'dns' {
 		$ParameterHash.Add('DnsServer',$DnsServer)
 		$ParameterHash.Add('DnsDomain',$DnsDomain)
 		if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
 		if ($LimitSubnet) { $ParameterHash.Add('IncludeSubnet',$LimitSubnet) }
 		if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
 	}
-	'dns_WindowsAuthentication' {
-		$ParameterHash.Add('DnsServer',$DnsServer)
-		$ParameterHash.Add('DnsDomain',$DnsDomain)
-		if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
-		if ($LimitSubnet) { $ParameterHash.Add('IncludeSubnet',$LimitSubnet) }
-		if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
-	}
-	'subnet_SQLAuthentication' {
-		$ParameterHash.Add('Username',$Username)
-		$ParameterHash.Add('Password',$Password)
+	'subnet' {
 		$ParameterHash.Add('Subnet',$Subnet)
 		if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
 		if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
 	}
-	'subnet_WindowsAuthentication' {
-		$ParameterHash.Add('Subnet',$Subnet)
-		if ($ExcludeSubnet) { $ParameterHash.Add('ExcludeSubnet',$ExcludeSubnet) }
-		if ($ExcludeComputerName) { $ParameterHash.Add('ExcludeComputerName',$ExcludeComputerName) }
-	}
-	'computername_SQLAuthentication' {
-		$ParameterHash.Add('Username',$Username)
-		$ParameterHash.Add('Password',$Password)
-		$ParameterHash.Add('ComputerName',$ComputerName)
-	}
-	'computername_WindowsAuthentication' {
+	'computername' {
 		$ParameterHash.Add('ComputerName',$ComputerName)
 	}
 }

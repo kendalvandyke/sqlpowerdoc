@@ -182,7 +182,7 @@ function Write-Log {
 			# If we're not writing to the log then we need some way to alert on warnings and errors
 			# so write to the warning and error streams
 			if ($MessageLevel -ieq 'warning') {
-				Write-Warning $Message
+				Write-Warning $Message -WarningAction Continue
 			}
 			elseif ($MessageLevel -ieq 'error') {
 				Write-Error $Message -ErrorAction Continue
